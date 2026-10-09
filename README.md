@@ -28,7 +28,7 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-The React shell opens in an Electron window. The renderer still has no filesystem or terminal access.
+The IDE layout is in place and uses sample files. Electron opens the window. Real folders, Monaco, and the terminal are not connected yet.
 
 ## Learning Goals
 
