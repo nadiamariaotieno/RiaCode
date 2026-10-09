@@ -17,9 +17,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  height: 100%;
   padding: 8px 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
+}
+
+.new-window-button {
+  margin-top: auto;
 }
 
 .activity-button {
@@ -64,10 +69,19 @@
 .bottom-panel h2 {
   margin: 0;
   padding: 10px 12px;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-transform: uppercase;
+}
+
+.sidebar-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .tree,
@@ -75,7 +89,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  overflow: auto;
 }
 
 .tree .tree {
@@ -95,6 +108,25 @@
   gap: 8px;
   width: 100%;
   padding: 4px 12px;
+}
+
+.tree-twist {
+  flex: none;
+  width: 1em;
+}
+
+.tree-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-message {
+  margin: 0;
+  padding: 4px 12px 4px 32px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .tree-item.active,
