@@ -17,6 +17,8 @@ function contentSecurityPolicy() {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "worker-src 'self' blob:",
       "connect-src 'self' http://localhost:5174 ws://localhost:5174",
     ].join('; ')
   }
@@ -24,8 +26,10 @@ function contentSecurityPolicy() {
   return [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
+    "font-src 'self' data:",
+    "worker-src 'self' blob:",
     "connect-src 'self'",
   ].join('; ')
 }
