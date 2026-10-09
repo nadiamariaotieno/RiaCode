@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ActivityBar from './components/ActivityBar.jsx'
 import BottomPanel from './components/BottomPanel.jsx'
 import EditorArea from './components/EditorArea.jsx'
@@ -29,6 +29,7 @@ export default function App() {
   const [openFileIds, setOpenFileIds] = useState([])
   const [activeFileId, setActiveFileId] = useState(null)
   const [panelOpen, setPanelOpen] = useState(true)
+  const [dirtyIds, setDirtyIds] = useState([])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -51,7 +52,30 @@ export default function App() {
     setActiveFileId(id)
   }
 
+  const handleDirtyChange = useCallback((id, isDirty) => {
+    setDirtyIds((current) => {
+      const hasId = current.includes(id)
+      if (isDirty && !hasId) {
+        return [...current, id]
+      }
+      if (!isDirty && hasId) {
+        return current.filter((openId) => openId !== id)
+      }
+      return current
+    })
+  }, [])
+
   function closeTab(id) {
+    const file = findFile(sampleProject.files, id)
+    if (
+      dirtyIds.includes(id) &&
+      !window.confirm(
+        `${file?.name ?? 'This file'} has unsaved sample edits. Close it and discard those edits?`,
+      )
+    ) {
+      return
+    }
+
     const index = openFileIds.indexOf(id)
     const nextIds = openFileIds.filter((openId) => openId !== id)
     setOpenFileIds(nextIds)
@@ -77,8 +101,11 @@ export default function App() {
         <EditorArea
           tabs={tabs}
           activeFile={activeFile}
+          dirtyIds={dirtyIds}
+          theme={theme}
           onSelectTab={setActiveFileId}
           onCloseTab={closeTab}
+          onDirtyChange={handleDirtyChange}
         />
         {panelOpen && <BottomPanel />}
       </div>
