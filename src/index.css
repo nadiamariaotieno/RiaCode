@@ -2,11 +2,11 @@
   --text: #1f2328;
   --text-muted: #59636e;
   --bg: #ffffff;
-  --surface: #f6f8fa;
-  --border: #d0d7de;
-  --hover: #eaeef2;
-  --active: #ddf4ff;
-  --accent: #0969da;
+  --surface: #ffeef7;
+  --border: #fdd2e8;
+  --hover: #fdd2e8;
+  --active: #ffb7dd;
+  --accent: #fd9ed0;
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
@@ -19,12 +19,12 @@
 [data-theme='dark'] {
   --text: #e6edf3;
   --text-muted: #8b949e;
-  --bg: #0d1117;
-  --surface: #010409;
-  --border: #30363d;
-  --hover: #1f242c;
-  --active: #1f3a5f;
-  --accent: #4493f8;
+  --bg: #3a0022;
+  --surface: #4f002e;
+  --border: #6a003e;
+  --hover: #6a003e;
+  --active: #970059;
+  --accent: #c90076;
 
   color-scheme: dark;
 }
