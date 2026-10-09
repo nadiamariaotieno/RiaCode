@@ -1,14 +1,20 @@
-import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItem, session } from 'electron'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  createWorkspaceFile,
+  listDirectory,
+  resolveWorkspaceFile,
+  toPortableRelative,
+} from './workspaceFiles.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Keep this URL aligned with server.port in vite.config.js.
 const DEV_SERVER_URL = 'http://localhost:5174'
 const MAX_FILE_BYTES = 1024 * 1024
-const approvedFiles = new Set()
+const windowSessions = new Map()
 
 const useDist = app.isPackaged || process.env.ELECTRON_USE_DIST === '1'
 const isDev = !useDist
@@ -57,7 +63,26 @@ function isAllowedNavigation(url) {
   return url.startsWith(distUrl)
 }
 
-async function readApprovedTextFile(filePath) {
+function sessionFor(event) {
+  const current = windowSessions.get(event.sender.id)
+  if (!current) {
+    throw new Error('This window is no longer available.')
+  }
+  return current
+}
+
+function dialogParent(event) {
+  return BrowserWindow.fromWebContents(event.sender)
+}
+
+function openDialog(parent, options) {
+  if (parent && !parent.isDestroyed()) {
+    return dialog.showOpenDialog(parent, options)
+  }
+  return dialog.showOpenDialog(options)
+}
+
+async function readApprovedTextFile(approvedFiles, filePath) {
   const resolvedPath = path.resolve(filePath)
   const realPath = await fs.realpath(resolvedPath)
   const info = await fs.stat(realPath)
@@ -81,8 +106,9 @@ async function readApprovedTextFile(filePath) {
   }
 }
 
-ipcMain.handle('file:open', async () => {
-  const result = await dialog.showOpenDialog({
+ipcMain.handle('file:open', async (event) => {
+  const current = sessionFor(event)
+  const result = await openDialog(dialogParent(event), {
     title: 'Open file',
     properties: ['openFile'],
   })
@@ -90,10 +116,11 @@ ipcMain.handle('file:open', async () => {
     return null
   }
 
-  return readApprovedTextFile(result.filePaths[0])
+  return readApprovedTextFile(current.approvedFiles, result.filePaths[0])
 })
 
-ipcMain.handle('file:save', async (_event, payload) => {
+ipcMain.handle('file:save', async (event, payload) => {
+  const current = sessionFor(event)
   if (!payload || typeof payload.filePath !== 'string') {
     throw new Error('A file path is required.')
   }
@@ -102,8 +129,8 @@ ipcMain.handle('file:save', async (_event, payload) => {
   }
 
   const realPath = await fs.realpath(path.resolve(payload.filePath))
-  if (!approvedFiles.has(realPath)) {
-    throw new Error('That file was not opened from the file dialog.')
+  if (!current.approvedFiles.has(realPath)) {
+    throw new Error('That file was not opened in this window.')
   }
 
   const buffer = Buffer.from(payload.content, 'utf8')
@@ -115,6 +142,67 @@ ipcMain.handle('file:save', async (_event, payload) => {
   return { filePath: realPath }
 })
 
+ipcMain.handle('workspace:open', async (event) => {
+  const current = sessionFor(event)
+  const result = await openDialog(dialogParent(event), {
+    title: 'Open folder',
+    properties: ['openDirectory'],
+  })
+  if (result.canceled || result.filePaths.length !== 1) {
+    return null
+  }
+
+  const realPath = await fs.realpath(result.filePaths[0])
+  const info = await fs.stat(realPath)
+  if (!info.isDirectory()) {
+    throw new Error('That path is not a folder.')
+  }
+
+  current.workspaceRoot = realPath
+  return { name: path.basename(realPath) }
+})
+
+ipcMain.handle('workspace:list', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  return listDirectory(current.workspaceRoot, relativePath)
+})
+
+ipcMain.handle('workspace:readFile', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+
+  const realPath = await resolveWorkspaceFile(current.workspaceRoot, relativePath)
+  const opened = await readApprovedTextFile(current.approvedFiles, realPath)
+  return {
+    ...opened,
+    relativePath: toPortableRelative(current.workspaceRoot, realPath),
+  }
+})
+
+ipcMain.handle('workspace:createFile', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+
+  const realPath = await createWorkspaceFile(current.workspaceRoot, relativePath)
+  const opened = await readApprovedTextFile(current.approvedFiles, realPath)
+  return {
+    ...opened,
+    relativePath: toPortableRelative(current.workspaceRoot, realPath),
+  }
+})
+
+ipcMain.handle('window:new', () => {
+  createWindow()
+  return null
+})
+
 async function devServerIsReachable() {
   try {
     const response = await fetch(DEV_SERVER_URL, {
@@ -124,6 +212,27 @@ async function devServerIsReachable() {
   } catch {
     return false
   }
+}
+
+function installNewWindowMenu() {
+  const menu = Menu.getApplicationMenu()
+  const fileMenu = menu?.items.find((item) => item.label === 'File')
+  if (!fileMenu?.submenu) {
+    console.error('RiaCode could not add New Window to the File menu.')
+    return
+  }
+  fileMenu.submenu.insert(
+    0,
+    new MenuItem({
+      label: 'New Window',
+      accelerator: 'CommandOrControl+Shift+N',
+      click: () => {
+        createWindow()
+      },
+    }),
+  )
+  fileMenu.submenu.insert(1, new MenuItem({ type: 'separator' }))
+  Menu.setApplicationMenu(menu)
 }
 
 function createWindow() {
@@ -139,6 +248,15 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
     },
+  })
+
+  const sessionId = win.webContents.id
+  windowSessions.set(sessionId, {
+    workspaceRoot: null,
+    approvedFiles: new Set(),
+  })
+  win.on('closed', () => {
+    windowSessions.delete(sessionId)
   })
 
   win.once('ready-to-show', () => {
@@ -197,6 +315,7 @@ async function start() {
     }
   }
 
+  installNewWindowMenu()
   createWindow()
 
   app.on('activate', () => {
