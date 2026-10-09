@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { sampleChanges, sampleProject } from '../mockWorkspace.js'
 
-export default function Sidebar({ view, activeFileId, onOpenFile }) {
+export default function Sidebar({
+  view,
+  activeFileId,
+  onOpenFile,
+  onOpenDiskFile,
+}) {
   const [expanded, setExpanded] = useState({ src: true })
 
   function toggleFolder(id) {
@@ -14,6 +19,11 @@ export default function Sidebar({ view, activeFileId, onOpenFile }) {
       aria-label={view === 'explorer' ? 'Explorer' : 'Source Control'}
     >
       <h2>{view === 'explorer' ? sampleProject.name : 'Source Control'}</h2>
+      {view === 'explorer' && (
+        <button type="button" className="sidebar-action" onClick={onOpenDiskFile}>
+          Open file
+        </button>
+      )}
       {view === 'explorer' ? (
         <FileTree
           nodes={sampleProject.files}
