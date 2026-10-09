@@ -1,6 +1,35 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as monaco from 'monaco-editor'
 
+monaco.editor.defineTheme('riacode-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [],
+  colors: {
+    'editor.background': '#ffffff',
+    'editor.lineHighlightBackground': '#ffeef7',
+    'editor.selectionBackground': '#ffb7dd',
+    'editorLineNumber.foreground': '#fd9ed0',
+  },
+})
+
+monaco.editor.defineTheme('riacode-dark', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [],
+  colors: {
+    'editor.background': '#3a0022',
+    'editorGutter.background': '#3a0022',
+    'editor.lineHighlightBackground': '#4f002e',
+    'editor.selectionBackground': '#970059',
+    'editorLineNumber.foreground': '#c90076',
+  },
+})
+
+function monacoTheme(theme) {
+  return theme === 'dark' ? 'riacode-dark' : 'riacode-light'
+}
+
 function languageFor(fileName) {
   if (fileName.endsWith('.json')) {
     return 'json'
@@ -51,7 +80,7 @@ const EditorArea = forwardRef(function EditorArea(
 
   useEffect(() => {
     const editor = monaco.editor.create(containerRef.current, {
-      theme: themeRef.current === 'dark' ? 'vs-dark' : 'vs',
+      theme: monacoTheme(themeRef.current),
       automaticLayout: true,
       fontFamily: 'ui-monospace, Consolas, monospace',
       fontSize: 13,
@@ -67,7 +96,7 @@ const EditorArea = forwardRef(function EditorArea(
   }, [])
 
   useEffect(() => {
-    monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs')
+    monaco.editor.setTheme(monacoTheme(theme))
   }, [theme])
 
   useEffect(() => {
