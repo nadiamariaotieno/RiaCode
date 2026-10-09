@@ -53,6 +53,13 @@
   border-right: 1px solid var(--border);
 }
 
+.sidebar-action {
+  margin: 0 12px 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
 .sidebar h2,
 .bottom-panel h2 {
   margin: 0;
@@ -95,8 +102,13 @@
 .change-list button:hover,
 .tab.active,
 .tab:hover,
-.status-bar button:hover {
+.status-bar button:hover:enabled {
   background: var(--hover);
+}
+
+.status-bar button:disabled {
+  color: var(--text-muted);
+  cursor: default;
 }
 
 .tree-item.active {
