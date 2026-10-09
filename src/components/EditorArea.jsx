@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as monaco from 'monaco-editor'
 
 function languageFor(fileName) {
@@ -17,15 +17,18 @@ function languageFor(fileName) {
   return 'plaintext'
 }
 
-export default function EditorArea({
-  tabs,
-  activeFile,
-  dirtyIds,
-  theme,
-  onSelectTab,
-  onCloseTab,
-  onDirtyChange,
-}) {
+const EditorArea = forwardRef(function EditorArea(
+  {
+    tabs,
+    activeFile,
+    dirtyIds,
+    theme,
+    onSelectTab,
+    onCloseTab,
+    onDirtyChange,
+  },
+  ref,
+) {
   const containerRef = useRef(null)
   const editorRef = useRef(null)
   const modelsRef = useRef(new Map())
@@ -35,6 +38,16 @@ export default function EditorArea({
   useEffect(() => {
     dirtyChangeRef.current = onDirtyChange
   }, [onDirtyChange])
+
+  useImperativeHandle(ref, () => ({
+    getValue(id) {
+      const entry = modelsRef.current.get(id)
+      if (!entry || entry.model.isDisposed()) {
+        return null
+      }
+      return entry.model.getValue()
+    },
+  }))
 
   useEffect(() => {
     const editor = monaco.editor.create(containerRef.current, {
@@ -68,9 +81,12 @@ export default function EditorArea({
       return
     }
 
-    let entry = modelsRef.current.get(activeFile.id)
+    const fileId = activeFile.id
+    let entry = modelsRef.current.get(fileId)
     if (!entry || entry.model.isDisposed()) {
-      const uri = monaco.Uri.parse(`inmemory://sample/${activeFile.id}`)
+      const uri = monaco.Uri.parse(
+        `inmemory://model/${encodeURIComponent(fileId)}`,
+      )
       const existing = monaco.editor.getModel(uri)
       const model =
         existing ??
@@ -80,13 +96,24 @@ export default function EditorArea({
           uri,
         )
       const subscription = model.onDidChangeContent(() => {
+        const current = modelsRef.current.get(fileId)
         dirtyChangeRef.current(
-          activeFile.id,
-          model.getValue() !== activeFile.content,
+          fileId,
+          model.getValue() !== current?.savedContent,
         )
       })
-      entry = { model, subscription }
-      modelsRef.current.set(activeFile.id, entry)
+      entry = {
+        model,
+        subscription,
+        savedContent: activeFile.content,
+      }
+      modelsRef.current.set(fileId, entry)
+    } else if (entry.savedContent !== activeFile.content) {
+      entry.savedContent = activeFile.content
+      dirtyChangeRef.current(
+        fileId,
+        entry.model.getValue() !== entry.savedContent,
+      )
     }
 
     editor.setModel(entry.model)
@@ -145,4 +172,6 @@ export default function EditorArea({
       </div>
     </section>
   )
-}
+})
+
+export default EditorArea
