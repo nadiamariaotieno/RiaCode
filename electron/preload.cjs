@@ -12,4 +12,19 @@ contextBridge.exposeInMainWorld('riacode', {
   saveFile(filePath, content) {
     return ipcRenderer.invoke('file:save', { filePath, content })
   },
+  openFolder() {
+    return ipcRenderer.invoke('workspace:open')
+  },
+  listDirectory(relativePath) {
+    return ipcRenderer.invoke('workspace:list', relativePath)
+  },
+  readWorkspaceFile(relativePath) {
+    return ipcRenderer.invoke('workspace:readFile', relativePath)
+  },
+  createWorkspaceFile(relativePath) {
+    return ipcRenderer.invoke('workspace:createFile', relativePath)
+  },
+  openWindow() {
+    return ipcRenderer.invoke('window:new')
+  },
 })
