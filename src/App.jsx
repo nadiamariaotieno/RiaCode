@@ -32,7 +32,11 @@ export default function App() {
   const [dirtyIds, setDirtyIds] = useState([])
   const [diskFiles, setDiskFiles] = useState([])
   const [statusMessage, setStatusMessage] = useState('')
+  const [workspaceName, setWorkspaceName] = useState(null)
+  const [workspaceEntries, setWorkspaceEntries] = useState({})
+  const [expandedFolders, setExpandedFolders] = useState({})
   const editorRef = useRef(null)
+  const workspaceGeneration = useRef(0)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -52,6 +56,37 @@ export default function App() {
 
   const tabs = openFileIds.map((id) => findDocument(id)).filter(Boolean)
   const activeFile = findDocument(activeFileId)
+
+  function rememberDiskFile(opened) {
+    setDiskFiles((current) => {
+      const existing = current.find((file) => file.id === opened.filePath)
+      if (!existing) {
+        return [
+          ...current,
+          {
+            id: opened.filePath,
+            name: opened.name,
+            content: opened.content,
+            filePath: opened.filePath,
+            relativePath: opened.relativePath,
+          },
+        ]
+      }
+      if (
+        opened.relativePath &&
+        existing.relativePath !== opened.relativePath
+      ) {
+        return current.map((file) =>
+          file.id === opened.filePath
+            ? { ...file, relativePath: opened.relativePath }
+            : file,
+        )
+      }
+      return current
+    })
+    openFile(opened.filePath)
+    setStatusMessage('')
+  }
 
   function openFile(id) {
     setOpenFileIds((current) =>
@@ -88,21 +123,187 @@ export default function App() {
         return
       }
 
-      setDiskFiles((current) =>
-        current.some((file) => file.id === opened.filePath)
-          ? current
-          : [
-              ...current,
-              {
-                id: opened.filePath,
-                name: opened.name,
-                content: opened.content,
-                filePath: opened.filePath,
-              },
-            ],
-      )
-      openFile(opened.filePath)
+      rememberDiskFile(opened)
+    } catch (error) {
+      setStatusMessage(error.message ?? 'The file could not be opened.')
+    }
+  }
+
+  async function openFolder() {
+    if (!desktop?.openFolder) {
+      setStatusMessage('Open a folder from the RiaCode desktop window.')
+      return
+    }
+
+    let switched = false
+    let generation = workspaceGeneration.current
+    try {
+      const opened = await desktop.openFolder()
+      if (!opened) {
+        return
+      }
+
+      generation = workspaceGeneration.current + 1
+      workspaceGeneration.current = generation
+      switched = true
+      setWorkspaceName(opened.name)
+      setWorkspaceEntries({})
+      setExpandedFolders({})
+      setActivity('explorer')
       setStatusMessage('')
+
+      const children = await desktop.listDirectory('')
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+
+      setWorkspaceEntries({ '': children })
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      if (switched) {
+        setWorkspaceEntries(null)
+      }
+      setStatusMessage(error.message ?? 'The folder could not be opened.')
+    }
+  }
+
+  async function toggleWorkspaceFolder(relativePath) {
+    if (expandedFolders[relativePath]) {
+      setExpandedFolders((current) => ({ ...current, [relativePath]: false }))
+      return
+    }
+
+    if (workspaceEntries[relativePath]) {
+      setExpandedFolders((current) => ({ ...current, [relativePath]: true }))
+      return
+    }
+
+    const generation = workspaceGeneration.current
+    setExpandedFolders((current) => ({ ...current, [relativePath]: true }))
+    try {
+      const children = await desktop.listDirectory(relativePath)
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setWorkspaceEntries((current) => ({
+        ...current,
+        [relativePath]: children,
+      }))
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setExpandedFolders((current) => ({ ...current, [relativePath]: false }))
+      setStatusMessage(error.message ?? 'That folder could not be listed.')
+    }
+  }
+
+  async function openNewWindow() {
+    if (!desktop?.openWindow) {
+      setStatusMessage('Open a new window from the RiaCode desktop window.')
+      return
+    }
+
+    try {
+      await desktop.openWindow()
+    } catch (error) {
+      setStatusMessage(error.message ?? 'A new window could not be opened.')
+    }
+  }
+
+  async function createFile() {
+    if (!desktop?.createWorkspaceFile) {
+      setStatusMessage('Create a file from the RiaCode desktop window.')
+      return
+    }
+    if (!workspaceName) {
+      setStatusMessage('Open a folder before creating a file.')
+      return
+    }
+
+    const entered = window.prompt(
+      'File name in this folder. Use a path like src/notes.txt when that folder already exists.',
+      'untitled.txt',
+    )
+    if (!entered) {
+      return
+    }
+
+    const generation = workspaceGeneration.current
+    try {
+      const opened = await desktop.createWorkspaceFile(entered)
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      rememberDiskFile(opened)
+      try {
+        await refreshCreatedFile(opened.relativePath, generation)
+      } catch (error) {
+        if (generation !== workspaceGeneration.current) {
+          return
+        }
+        setStatusMessage(
+          error.message ??
+            'The file was created, but the folder list could not be refreshed.',
+        )
+        return
+      }
+      setStatusMessage('Created')
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setStatusMessage(error.message ?? 'The file could not be created.')
+    }
+  }
+
+  async function refreshCreatedFile(relativePath, generation) {
+    const ancestors = []
+    const parts = relativePath.split('/')
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      ancestors.push(parts.slice(0, index + 1).join('/'))
+    }
+
+    const listings = await Promise.all([
+      desktop.listDirectory(''),
+      ...ancestors.map((folder) => desktop.listDirectory(folder)),
+    ])
+    if (generation !== workspaceGeneration.current) {
+      return
+    }
+
+    setWorkspaceEntries((current) => {
+      if (!current) {
+        return current
+      }
+      const next = { ...current, '': listings[0] }
+      ancestors.forEach((folder, index) => {
+        next[folder] = listings[index + 1]
+      })
+      return next
+    })
+    if (ancestors.length > 0) {
+      setExpandedFolders((current) => {
+        const next = { ...current }
+        for (const folder of ancestors) {
+          next[folder] = true
+        }
+        return next
+      })
+    }
+  }
+
+  async function openWorkspaceFile(relativePath) {
+    if (!desktop?.readWorkspaceFile) {
+      setStatusMessage('Open a folder from the RiaCode desktop window.')
+      return
+    }
+
+    try {
+      const opened = await desktop.readWorkspaceFile(relativePath)
+      rememberDiskFile(opened)
     } catch (error) {
       setStatusMessage(error.message ?? 'The file could not be opened.')
     }
@@ -156,12 +357,24 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <ActivityBar activeView={activity} onSelectView={setActivity} />
+      <ActivityBar
+        activeView={activity}
+        onSelectView={setActivity}
+        onNewWindow={openNewWindow}
+      />
       <Sidebar
         view={activity}
         activeFileId={activeFileId}
+        activeRelativePath={activeFile?.relativePath}
+        workspaceName={workspaceName}
+        workspaceEntries={workspaceEntries}
+        expandedFolders={expandedFolders}
         onOpenFile={openFile}
         onOpenDiskFile={openDiskFile}
+        onOpenFolder={openFolder}
+        onCreateFile={createFile}
+        onToggleWorkspaceFolder={toggleWorkspaceFolder}
+        onOpenWorkspaceFile={openWorkspaceFile}
       />
       <div className="workbench">
         <EditorArea
