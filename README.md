@@ -28,7 +28,7 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-Currently in the initial setup phase.
+The React and Vite application shell is in place. Electron has not been added.
 
 ## Learning Goals
 
