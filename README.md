@@ -38,6 +38,26 @@ Currently in the initial setup phase.
 * Practice Git version control
 * Apply secure development principles
 
+## Development
+
+This repository contains a React application created with Vite and ESLint.
+
+From this folder:
+
+```powershell
+npm install
+npm run dev
+```
+
+`npm install` installs the dependencies listed in `package.json`.
+`npm run dev` starts the Vite development server.
+
+Other scripts:
+
+- `npm run build` writes the production files into `dist`.
+- `npm run lint` checks the project with ESLint.
+- `npm run preview` serves the production build locally.
+
 ---
 
 Built as a personal learning project.
