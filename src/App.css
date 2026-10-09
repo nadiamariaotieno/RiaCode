@@ -158,14 +158,19 @@
   padding-left: 0;
 }
 
-.editor-text {
+.tab-dirty {
+  margin-right: 6px;
+  color: var(--accent);
+}
+
+.editor-body {
+  position: relative;
   flex: 1;
-  margin: 0;
-  padding: 16px;
-  overflow: auto;
-  font-family: var(--mono);
-  font-size: 13px;
-  white-space: pre;
+  min-height: 0;
+}
+
+.editor-surface {
+  height: 100%;
 }
 
 .editor-empty {
