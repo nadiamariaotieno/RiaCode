@@ -25,3 +25,7 @@
   margin: 0;
   color: var(--text-muted);
 }
+
+.workspace p + p {
+  margin-top: 8px;
+}

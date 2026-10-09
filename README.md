@@ -28,7 +28,7 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-The React and Vite application shell is in place. Electron has not been added.
+The React shell opens in an Electron window. The renderer still has no filesystem or terminal access.
 
 ## Learning Goals
 
@@ -50,13 +50,14 @@ npm run dev
 ```
 
 `npm install` installs the dependencies listed in `package.json`.
-`npm run dev` starts the Vite development server.
+`npm run dev` starts the Vite development server at http://localhost:5174.
+`npm run electron` opens that server in a desktop window. Start `npm run dev` first.
 
 Other scripts:
 
 - `npm run build` writes the production files into `dist`.
 - `npm run lint` checks the project with ESLint.
-- `npm run preview` serves the production build locally.
+- `npm run preview` serves the production build locally in a browser.
 
 ---
 
