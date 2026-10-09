@@ -1,31 +1,209 @@
 .app-shell {
+  display: grid;
+  grid-template-columns: 48px minmax(180px, 240px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+.app-shell button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.activity-bar {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  gap: 4px;
+  padding: 8px 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
 }
 
-.title-bar {
-  border-bottom: 1px solid var(--border);
-  background: var(--header-bg);
-  padding: 8px 16px;
+.activity-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--text-muted);
 }
 
-.title-bar h1 {
+.activity-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.activity-button.active,
+.activity-button:hover {
+  color: var(--text);
+}
+
+.activity-button.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar h2,
+.bottom-panel h2 {
   margin: 0;
-  font-size: 16px;
+  padding: 10px 12px;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.workspace {
-  flex: 1;
-  padding: 16px;
+.tree,
+.change-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
 }
 
-.workspace p {
+.tree .tree {
+  padding-left: 12px;
+}
+
+.tree-item,
+.change-list button,
+.tab button,
+.status-bar button {
+  text-align: left;
+}
+
+.tree-item,
+.change-list button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px;
+}
+
+.tree-item.active,
+.tree-item:hover,
+.change-list button:hover,
+.tab.active,
+.tab:hover,
+.status-bar button:hover {
+  background: var(--hover);
+}
+
+.tree-item.active {
+  background: var(--active);
+}
+
+.change-list button span:first-child {
+  color: var(--accent);
+}
+
+.sidebar-note,
+.editor-empty,
+.bottom-panel p {
   margin: 0;
   color: var(--text-muted);
 }
 
-.workspace p + p {
-  margin-top: 8px;
+.sidebar-note {
+  margin-top: auto;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.workbench {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tab-bar {
+  display: flex;
+  min-height: 36px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border-right: 1px solid var(--border);
+}
+
+.tab button {
+  padding: 8px 10px;
+}
+
+.tab-close {
+  padding-left: 0;
+}
+
+.editor-text {
+  flex: 1;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: pre;
+}
+
+.editor-empty {
+  padding: 16px;
+}
+
+.bottom-panel {
+  height: 160px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.bottom-panel p {
+  padding: 0 12px 12px;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+}
+
+.status-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: 48px minmax(140px, 180px) minmax(0, 1fr);
+  }
+
+  .status-bar {
+    flex-wrap: wrap;
+  }
 }
