@@ -28,7 +28,7 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-Monaco edits the sample files in memory. Electron opens the window. Edits are not saved to disk, and real folders and the terminal are not connected yet.
+Monaco can open and save one text file chosen in the desktop window. The sample project is still not a real folder, and the terminal is not connected yet.
 
 ## Learning Goals
 
