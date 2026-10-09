@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -6,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Keep this URL aligned with server.port in vite.config.js.
 const DEV_SERVER_URL = 'http://localhost:5174'
+const MAX_FILE_BYTES = 1024 * 1024
+const approvedFiles = new Set()
 
 const useDist = app.isPackaged || process.env.ELECTRON_USE_DIST === '1'
 const isDev = !useDist
@@ -53,6 +56,64 @@ function isAllowedNavigation(url) {
   const distUrl = pathToFileURL(path.join(__dirname, '../dist')).href
   return url.startsWith(distUrl)
 }
+
+async function readApprovedTextFile(filePath) {
+  const resolvedPath = path.resolve(filePath)
+  const realPath = await fs.realpath(resolvedPath)
+  const info = await fs.stat(realPath)
+  if (!info.isFile()) {
+    throw new Error('That path is not a file.')
+  }
+  if (info.size > MAX_FILE_BYTES) {
+    throw new Error('Files larger than 1 MB are not supported yet.')
+  }
+
+  const buffer = await fs.readFile(realPath)
+  if (buffer.includes(0)) {
+    throw new Error('This file does not look like UTF-8 text.')
+  }
+
+  approvedFiles.add(realPath)
+  return {
+    filePath: realPath,
+    name: path.basename(realPath),
+    content: buffer.toString('utf8'),
+  }
+}
+
+ipcMain.handle('file:open', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Open file',
+    properties: ['openFile'],
+  })
+  if (result.canceled || result.filePaths.length !== 1) {
+    return null
+  }
+
+  return readApprovedTextFile(result.filePaths[0])
+})
+
+ipcMain.handle('file:save', async (_event, payload) => {
+  if (!payload || typeof payload.filePath !== 'string') {
+    throw new Error('A file path is required.')
+  }
+  if (typeof payload.content !== 'string') {
+    throw new Error('The file content must be text.')
+  }
+
+  const realPath = await fs.realpath(path.resolve(payload.filePath))
+  if (!approvedFiles.has(realPath)) {
+    throw new Error('That file was not opened from the file dialog.')
+  }
+
+  const buffer = Buffer.from(payload.content, 'utf8')
+  if (buffer.length > MAX_FILE_BYTES) {
+    throw new Error('Files larger than 1 MB are not supported yet.')
+  }
+
+  await fs.writeFile(realPath, buffer)
+  return { filePath: realPath }
+})
 
 async function devServerIsReachable() {
   try {
