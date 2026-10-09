@@ -3,7 +3,7 @@ const views = [
   { id: 'source-control', label: 'Source Control' },
 ]
 
-export default function ActivityBar({ activeView, onSelectView }) {
+export default function ActivityBar({ activeView, onSelectView, onNewWindow }) {
   return (
     <nav className="activity-bar" aria-label="Activity bar">
       {views.map((view) => (
@@ -21,7 +21,39 @@ export default function ActivityBar({ activeView, onSelectView }) {
           {view.id === 'explorer' ? <FolderIcon /> : <BranchIcon />}
         </button>
       ))}
+      <button
+        type="button"
+        className="activity-button new-window-button"
+        aria-label="New window"
+        title="New window"
+        onClick={onNewWindow}
+      >
+        <NewWindowIcon />
+      </button>
     </nav>
+  )
+}
+
+function NewWindowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect
+        x="8"
+        y="8"
+        width="12"
+        height="12"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M5 15.5V5.5A1.5 1.5 0 0 1 6.5 4H15"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
   )
 }
 
