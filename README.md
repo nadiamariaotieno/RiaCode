@@ -28,7 +28,7 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-The IDE layout is in place and uses sample files. Electron opens the window. Real folders, Monaco, and the terminal are not connected yet.
+Monaco edits the sample files in memory. Electron opens the window. Edits are not saved to disk, and real folders and the terminal are not connected yet.
 
 ## Learning Goals
 
