@@ -76,6 +76,43 @@ const EditorArea = forwardRef(function EditorArea(
       }
       return entry.model.getValue()
     },
+    renameBuffer(oldId, newId) {
+      if (!oldId || !newId || oldId === newId) {
+        return
+      }
+      const entry = modelsRef.current.get(oldId)
+      if (!entry || entry.model.isDisposed()) {
+        return
+      }
+      const editor = editorRef.current
+      const wasCurrent = editor?.getModel() === entry.model
+      const value = entry.model.getValue()
+      const savedContent = entry.savedContent
+      const language = entry.model.getLanguageId()
+      entry.subscription.dispose()
+      entry.model.dispose()
+      modelsRef.current.delete(oldId)
+
+      const uri = monaco.Uri.parse(
+        `inmemory://model/${encodeURIComponent(newId)}`,
+      )
+      const existing = monaco.editor.getModel(uri)
+      if (existing && !existing.isDisposed()) {
+        existing.dispose()
+      }
+      const model = monaco.editor.createModel(value, language, uri)
+      const subscription = model.onDidChangeContent(() => {
+        const current = modelsRef.current.get(newId)
+        dirtyChangeRef.current(
+          newId,
+          model.getValue() !== current?.savedContent,
+        )
+      })
+      modelsRef.current.set(newId, { model, subscription, savedContent })
+      if (wasCurrent && editor) {
+        editor.setModel(model)
+      }
+    },
   }))
 
   useEffect(() => {

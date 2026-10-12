@@ -35,6 +35,7 @@ export default function App() {
   const [workspaceName, setWorkspaceName] = useState(null)
   const [workspaceEntries, setWorkspaceEntries] = useState({})
   const [expandedFolders, setExpandedFolders] = useState({})
+  const [selectedRelativePath, setSelectedRelativePath] = useState(null)
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -149,6 +150,7 @@ export default function App() {
       setWorkspaceName(opened.name)
       setWorkspaceEntries({})
       setExpandedFolders({})
+      setSelectedRelativePath(null)
       setActivity('explorer')
       setStatusMessage('')
 
@@ -170,6 +172,7 @@ export default function App() {
   }
 
   async function toggleWorkspaceFolder(relativePath) {
+    setSelectedRelativePath(relativePath)
     if (expandedFolders[relativePath]) {
       setExpandedFolders((current) => ({ ...current, [relativePath]: false }))
       return
@@ -238,6 +241,7 @@ export default function App() {
         return
       }
       rememberDiskFile(opened)
+      setSelectedRelativePath(opened.relativePath)
       try {
         await refreshCreatedFile(opened.relativePath, generation)
       } catch (error) {
@@ -295,6 +299,226 @@ export default function App() {
     }
   }
 
+  function findWorkspaceEntry(relativePath) {
+    for (const children of Object.values(workspaceEntries ?? {})) {
+      if (!Array.isArray(children)) {
+        continue
+      }
+      const match = children.find((entry) => entry.relativePath === relativePath)
+      if (match) {
+        return match
+      }
+    }
+    return null
+  }
+
+  function replacePrefix(value, fromPrefix, toPrefix) {
+    if (typeof value !== 'string' || !fromPrefix) {
+      return null
+    }
+    if (value === fromPrefix) {
+      return toPrefix
+    }
+    const separator = value.includes('\\') ? '\\' : '/'
+    const prefix = fromPrefix.endsWith(separator)
+      ? fromPrefix
+      : `${fromPrefix}${separator}`
+    if (!value.startsWith(prefix)) {
+      return null
+    }
+    return `${toPrefix}${separator}${value.slice(prefix.length)}`
+  }
+
+  function baseName(filePath) {
+    const parts = filePath.split(/[\\/]/)
+    return parts[parts.length - 1] || filePath
+  }
+
+  function parentRelative(relativePath) {
+    const slash = relativePath.lastIndexOf('/')
+    return slash === -1 ? '' : relativePath.slice(0, slash)
+  }
+
+  async function refreshParentListing(relativePath, generation, removedPrefix) {
+    const parent = parentRelative(relativePath)
+    const children = await desktop.listDirectory(parent)
+    if (generation !== workspaceGeneration.current) {
+      return
+    }
+    setWorkspaceEntries((current) => {
+      if (!current) {
+        return current
+      }
+      const next = {}
+      for (const [key, value] of Object.entries(current)) {
+        if (
+          removedPrefix &&
+          (key === removedPrefix || key.startsWith(`${removedPrefix}/`))
+        ) {
+          continue
+        }
+        next[key] = value
+      }
+      next[parent] = children
+      return next
+    })
+  }
+
+  function applyRename(renamed) {
+    const idMap = new Map()
+    const nextFiles = diskFiles.map((file) => {
+      const nextPath = file.filePath
+        ? replacePrefix(file.filePath, renamed.fromReal, renamed.toReal)
+        : null
+      const nextRelative = file.relativePath
+        ? replacePrefix(file.relativePath, renamed.fromRelative, renamed.toRelative)
+        : null
+      if (!nextPath && !nextRelative) {
+        return file
+      }
+      const filePath = nextPath ?? file.filePath
+      const id = nextPath ?? file.id
+      if (id !== file.id) {
+        idMap.set(file.id, id)
+      }
+      return {
+        ...file,
+        id,
+        filePath,
+        relativePath: nextRelative ?? file.relativePath,
+        name: nextPath ? baseName(filePath) : file.name,
+      }
+    })
+    for (const [fromId, toId] of idMap) {
+      editorRef.current?.renameBuffer(fromId, toId)
+    }
+    setDiskFiles(nextFiles)
+    if (idMap.size > 0) {
+      setOpenFileIds((current) => current.map((id) => idMap.get(id) ?? id))
+      setDirtyIds((current) => current.map((id) => idMap.get(id) ?? id))
+      setActiveFileId((current) => idMap.get(current) ?? current)
+    }
+  }
+
+  async function renameEntry() {
+    if (!desktop?.renameWorkspaceEntry) {
+      setStatusMessage('Rename a file from the RiaCode desktop window.')
+      return
+    }
+    const entry = findWorkspaceEntry(selectedRelativePath)
+    if (!entry) {
+      setStatusMessage('Select a file or folder in the open folder.')
+      return
+    }
+
+    const entered = window.prompt('New name', entry.name)
+    if (!entered || entered.trim() === entry.name) {
+      return
+    }
+
+    const generation = workspaceGeneration.current
+    try {
+      const renamed = await desktop.renameWorkspaceEntry(entry.relativePath, entered)
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      applyRename(renamed)
+      setSelectedRelativePath(renamed.toRelative)
+      await refreshParentListing(renamed.toRelative, generation, renamed.fromRelative)
+      setStatusMessage('Renamed')
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setStatusMessage(error.message ?? 'That item could not be renamed.')
+    }
+  }
+
+  function matchesRemoved(file, removed) {
+    if (file.relativePath === removed.relativePath) {
+      return true
+    }
+    if (
+      removed.type === 'folder' &&
+      file.relativePath?.startsWith(`${removed.relativePath}/`)
+    ) {
+      return true
+    }
+    return Boolean(
+      file.filePath &&
+        replacePrefix(file.filePath, removed.realPath, removed.realPath),
+    )
+  }
+
+  async function deleteEntry() {
+    if (!desktop?.deleteWorkspaceEntry) {
+      setStatusMessage('Delete a file from the RiaCode desktop window.')
+      return
+    }
+    const entry = findWorkspaceEntry(selectedRelativePath)
+    if (!entry) {
+      setStatusMessage('Select a file or folder in the open folder.')
+      return
+    }
+
+    const removedPreview = {
+      type: entry.type,
+      relativePath: entry.relativePath,
+      realPath: '',
+    }
+    const dirty = diskFiles.some(
+      (file) =>
+        matchesRemoved(file, removedPreview) && dirtyIds.includes(file.id),
+    )
+    const question =
+      entry.type === 'folder'
+        ? `Delete ${entry.name} and everything inside it?`
+        : `Delete ${entry.name}?`
+    const warning = dirty
+      ? ' Unsaved edits in this window will be discarded.'
+      : ''
+    if (!window.confirm(`${question}${warning}`)) {
+      return
+    }
+
+    const generation = workspaceGeneration.current
+    try {
+      const removed = await desktop.deleteWorkspaceEntry(entry.relativePath)
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      const closingIds = new Set(
+        diskFiles.filter((file) => matchesRemoved(file, removed)).map((file) => file.id),
+      )
+      const remaining = openFileIds.filter((id) => !closingIds.has(id))
+      if (closingIds.has(activeFileId)) {
+        const index = openFileIds.indexOf(activeFileId)
+        setActiveFileId(remaining[index] ?? remaining[index - 1] ?? null)
+      }
+      setOpenFileIds(remaining)
+      setDirtyIds((current) => current.filter((id) => !closingIds.has(id)))
+      setDiskFiles((current) => current.filter((file) => !closingIds.has(file.id)))
+      setExpandedFolders((current) => {
+        const next = {}
+        for (const [key, value] of Object.entries(current)) {
+          if (key === removed.relativePath || key.startsWith(`${removed.relativePath}/`)) {
+            continue
+          }
+          next[key] = value
+        }
+        return next
+      })
+      setSelectedRelativePath(null)
+      await refreshParentListing(removed.relativePath, generation, removed.relativePath)
+      setStatusMessage('Deleted')
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setStatusMessage(error.message ?? 'That item could not be deleted.')
+    }
+  }
+
   async function openWorkspaceFile(relativePath) {
     if (!desktop?.readWorkspaceFile) {
       setStatusMessage('Open a folder from the RiaCode desktop window.')
@@ -303,6 +527,7 @@ export default function App() {
 
     try {
       const opened = await desktop.readWorkspaceFile(relativePath)
+      setSelectedRelativePath(opened.relativePath ?? relativePath)
       rememberDiskFile(opened)
     } catch (error) {
       setStatusMessage(error.message ?? 'The file could not be opened.')
@@ -365,7 +590,6 @@ export default function App() {
       <Sidebar
         view={activity}
         activeFileId={activeFileId}
-        activeRelativePath={activeFile?.relativePath}
         workspaceName={workspaceName}
         workspaceEntries={workspaceEntries}
         expandedFolders={expandedFolders}
@@ -373,6 +597,9 @@ export default function App() {
         onOpenDiskFile={openDiskFile}
         onOpenFolder={openFolder}
         onCreateFile={createFile}
+        onRenameEntry={renameEntry}
+        onDeleteEntry={deleteEntry}
+        selectedRelativePath={selectedRelativePath}
         onToggleWorkspaceFolder={toggleWorkspaceFolder}
         onOpenWorkspaceFile={openWorkspaceFile}
       />
