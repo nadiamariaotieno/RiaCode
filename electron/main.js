@@ -4,7 +4,10 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   createWorkspaceFile,
+  deleteWorkspaceEntry,
+  isInsideRoot,
   listDirectory,
+  renameWorkspaceEntry,
   resolveWorkspaceFile,
   toPortableRelative,
 } from './workspaceFiles.js'
@@ -196,6 +199,64 @@ ipcMain.handle('workspace:createFile', async (event, relativePath) => {
     ...opened,
     relativePath: toPortableRelative(current.workspaceRoot, realPath),
   }
+})
+
+function retargetApproved(approvedFiles, fromReal, toReal, isFolder) {
+  const moved = []
+  for (const approved of approvedFiles) {
+    if (approved === fromReal || (isFolder && isInsideRoot(fromReal, approved))) {
+      moved.push(approved)
+    }
+  }
+  for (const approved of moved) {
+    approvedFiles.delete(approved)
+    const relative = path.relative(fromReal, approved)
+    approvedFiles.add(relative === '' ? toReal : path.join(toReal, relative))
+  }
+}
+
+function dropApproved(approvedFiles, realPath, isFolder) {
+  for (const approved of [...approvedFiles]) {
+    if (approved === realPath || (isFolder && isInsideRoot(realPath, approved))) {
+      approvedFiles.delete(approved)
+    }
+  }
+}
+
+ipcMain.handle('workspace:rename', async (event, payload) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (!payload || typeof payload.relativePath !== 'string') {
+    throw new Error('A path inside the open folder is required.')
+  }
+
+  const renamed = await renameWorkspaceEntry(
+    current.workspaceRoot,
+    payload.relativePath,
+    payload.newName,
+  )
+  if (renamed.fromReal !== renamed.toReal) {
+    retargetApproved(
+      current.approvedFiles,
+      renamed.fromReal,
+      renamed.toReal,
+      renamed.type === 'folder',
+    )
+  }
+  return renamed
+})
+
+ipcMain.handle('workspace:delete', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+
+  const removed = await deleteWorkspaceEntry(current.workspaceRoot, relativePath)
+  dropApproved(current.approvedFiles, removed.realPath, removed.type === 'folder')
+  return removed
 })
 
 ipcMain.handle('window:new', () => {
