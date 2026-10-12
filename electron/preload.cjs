@@ -24,6 +24,12 @@ contextBridge.exposeInMainWorld('riacode', {
   createWorkspaceFile(relativePath) {
     return ipcRenderer.invoke('workspace:createFile', relativePath)
   },
+  renameWorkspaceEntry(relativePath, newName) {
+    return ipcRenderer.invoke('workspace:rename', { relativePath, newName })
+  },
+  deleteWorkspaceEntry(relativePath) {
+    return ipcRenderer.invoke('workspace:delete', relativePath)
+  },
   openWindow() {
     return ipcRenderer.invoke('window:new')
   },
