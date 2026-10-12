@@ -4,7 +4,6 @@ import { sampleChanges, sampleProject } from '../mockWorkspace.js'
 export default function Sidebar({
   view,
   activeFileId,
-  activeRelativePath,
   workspaceName,
   workspaceEntries,
   expandedFolders,
@@ -12,6 +11,9 @@ export default function Sidebar({
   onOpenDiskFile,
   onOpenFolder,
   onCreateFile,
+  onRenameEntry,
+  onDeleteEntry,
+  selectedRelativePath,
   onToggleWorkspaceFolder,
   onOpenWorkspaceFile,
 }) {
@@ -43,6 +45,12 @@ export default function Sidebar({
           <button type="button" className="sidebar-action" onClick={onCreateFile}>
             New file
           </button>
+          <button type="button" className="sidebar-action" onClick={onRenameEntry}>
+            Rename
+          </button>
+          <button type="button" className="sidebar-action" onClick={onDeleteEntry}>
+            Delete
+          </button>
         </>
       )}
       <div className="sidebar-body">
@@ -56,7 +64,7 @@ export default function Sidebar({
               nodes={rootEntries}
               entries={workspaceEntries}
               expanded={expandedFolders}
-              activeRelativePath={activeRelativePath}
+              selectedRelativePath={selectedRelativePath}
               onToggleFolder={onToggleWorkspaceFolder}
               onOpenFile={onOpenWorkspaceFile}
             />
@@ -141,7 +149,7 @@ function WorkspaceTree({
   nodes,
   entries,
   expanded,
-  activeRelativePath,
+  selectedRelativePath,
   onToggleFolder,
   onOpenFile,
 }) {
@@ -156,7 +164,11 @@ function WorkspaceTree({
               <>
                 <button
                   type="button"
-                  className="tree-item"
+                  className={
+                    node.relativePath === selectedRelativePath
+                      ? 'tree-item active'
+                      : 'tree-item'
+                  }
                   aria-expanded={isOpen}
                   onClick={() => onToggleFolder(node.relativePath)}
                 >
@@ -170,7 +182,7 @@ function WorkspaceTree({
                     nodes={children}
                     entries={entries}
                     expanded={expanded}
-                    activeRelativePath={activeRelativePath}
+                    selectedRelativePath={selectedRelativePath}
                     onToggleFolder={onToggleFolder}
                     onOpenFile={onOpenFile}
                   />
@@ -186,7 +198,7 @@ function WorkspaceTree({
               <button
                 type="button"
                 className={
-                  node.relativePath === activeRelativePath
+                  node.relativePath === selectedRelativePath
                     ? 'tree-item active'
                     : 'tree-item'
                 }
