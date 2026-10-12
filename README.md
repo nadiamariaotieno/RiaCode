@@ -8,14 +8,20 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Planned Features
 
-* Code editing with syntax highlighting
-* Project and file explorer
-* Multiple editor tabs
-* Integrated terminal
-* Light and dark themes
-* Git integration
-* AI-powered coding assistance
-* Developer-focused security features
+Done so far: syntax highlighting, tabs, light and dark themes, a folder tree, saving files from that folder, creating a file, and a second window with its own folder.
+
+1. Rename and delete inside the open folder.
+2. Integrated terminal, so a command and a test can run in that folder.
+3. Git status, diff, and commit.
+4. Security Radar, first slice: scan the open folder for secrets and known dependency problems, and show the result from the status bar. Findings stay read-only.
+5. Codebase X-Ray, first slice: a graph of which file imports which, and “Show me its connections” for a file.
+6. Language intelligence, including symbols and go to definition.
+7. Codebase X-Ray, second slice: function calls, and a path from a button through the frontend, API, and database.
+8. Understand Mode, the first AI feature. A selection can be explained at Simple, Developer, and Deep Dive levels. It does not edit files.
+9. Change Impact Preview. Before an AI edit: files, dependents, security notes, tests, and the diff. The change is approved, rejected, or edited first.
+10. Safe Experiment Mode. A Git worktree checkpoint, tests, a comparison, then keep or discard.
+11. Security Radar, second slice: insecure code patterns, with a suggested fix that goes through the preview.
+12. Flow Mode. A task gathers the files, checklist, tests, and security notes from the steps above, and the task can be resumed.
 
 ## Planned Technology Stack
 
@@ -28,7 +34,9 @@ This project is a hands-on learning experience focused on understanding how mode
 
 ## Project Status
 
-Monaco can open and save one text file chosen in the desktop window. The sample project is still not a real folder, and the terminal is not connected yet.
+The desktop window can open a folder, list it, and open, save, and create text files there. A second window keeps its own folder. Source Control is still sample data.
+
+Next step: rename and delete inside the open folder. The terminal and Git come after that.
 
 ## Learning Goals
 
