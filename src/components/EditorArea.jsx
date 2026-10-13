@@ -76,6 +76,16 @@ const EditorArea = forwardRef(function EditorArea(
       }
       return entry.model.getValue()
     },
+    replaceBuffer(id, content) {
+      const entry = modelsRef.current.get(id)
+      if (!entry || entry.model.isDisposed()) {
+        return false
+      }
+      entry.savedContent = content
+      entry.model.setValue(content)
+      dirtyChangeRef.current(id, false)
+      return true
+    },
     renameBuffer(oldId, newId) {
       if (!oldId || !newId || oldId === newId) {
         return
