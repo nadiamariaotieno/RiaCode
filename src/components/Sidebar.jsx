@@ -22,6 +22,11 @@ export default function Sidebar({
   onOpenGitDiff,
   onToggleGitStage,
   onGitCommit,
+  securityReport,
+  securityError,
+  securityScanning,
+  onScanSecurity,
+  onOpenSecurityFinding,
 }) {
   const [expanded, setExpanded] = useState({ src: true })
   const rootEntries = workspaceEntries?.['']
@@ -33,12 +38,20 @@ export default function Sidebar({
   return (
     <aside
       className="sidebar"
-      aria-label={view === 'explorer' ? 'Explorer' : 'Source Control'}
+      aria-label={
+        view === 'explorer'
+          ? 'Explorer'
+          : view === 'security'
+            ? 'Security'
+            : 'Source Control'
+      }
     >
       <h2>
         {view === 'explorer'
           ? (workspaceName ?? sampleProject.name)
-          : 'Source Control'}
+          : view === 'security'
+            ? 'Security'
+            : 'Source Control'}
       </h2>
       {view === 'explorer' && (
         <>
@@ -85,6 +98,15 @@ export default function Sidebar({
             onToggleFolder={toggleFolder}
             onOpenFile={onOpenFile}
           />
+        ) : view === 'security' ? (
+          <SecurityFindings
+            workspaceName={workspaceName}
+            report={securityReport}
+            error={securityError}
+            scanning={securityScanning}
+            onScan={onScanSecurity}
+            onOpenFinding={onOpenSecurityFinding}
+          />
         ) : !workspaceName ? (
           <ul className="change-list">
             {sampleChanges.map((change) => (
@@ -110,10 +132,91 @@ export default function Sidebar({
       {view === 'explorer' && !workspaceName && (
         <p className="sidebar-note">Sample data. These files are not on disk.</p>
       )}
-      {view !== 'explorer' && !workspaceName && (
+      {view === 'source-control' && !workspaceName && (
         <p className="sidebar-note">Sample data. These changes are not from Git.</p>
       )}
     </aside>
+  )
+}
+
+function SecurityFindings({
+  workspaceName,
+  report,
+  error,
+  scanning,
+  onScan,
+  onOpenFinding,
+}) {
+  const secretCount = report?.secrets.length ?? 0
+  const dependencyCount = report?.dependencies.length ?? 0
+
+  return (
+    <>
+      <button
+        type="button"
+        className="sidebar-action"
+        onClick={onScan}
+        disabled={!workspaceName || scanning}
+      >
+        {scanning ? 'Scanning…' : 'Scan folder'}
+      </button>
+      {!workspaceName ? (
+        <p className="tree-message">Open a folder to scan it. Findings stay read-only.</p>
+      ) : error ? (
+        <p className="tree-message">{error}</p>
+      ) : !report ? (
+        <p className="tree-message">
+          {scanning
+            ? 'Scanning the open folder…'
+            : 'Scan checks for secrets and known dependency problems. It does not change files.'}
+        </p>
+      ) : (
+        <>
+          <p className="tree-message">
+            {secretCount === 0
+              ? 'No secrets found'
+              : `${secretCount} secret ${secretCount === 1 ? 'finding' : 'findings'}`}
+            {report.dependencySummary
+              ? `. Dependencies: ${report.dependencySummary.critical} critical, ${report.dependencySummary.high} high, ${report.dependencySummary.moderate} moderate, ${report.dependencySummary.low} low.`
+              : '.'}{' '}
+            {report.scannedFiles} files checked.
+          </p>
+          {report.notes.map((note) => (
+            <p key={note} className="tree-message">
+              {note}
+            </p>
+          ))}
+          {secretCount > 0 && (
+            <ul className="change-list">
+              {report.secrets.map((finding) => (
+                <li key={`${finding.path}:${finding.line}:${finding.kind}`}>
+                  <button type="button" onClick={() => onOpenFinding(finding)}>
+                    <span>{finding.kind}</span>
+                    <span className="tree-label">
+                      {finding.path}:{finding.line}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {dependencyCount > 0 && (
+            <ul className="change-list">
+              {report.dependencies.map((finding) => (
+                <li key={`${finding.severity}:${finding.name}:${finding.title}`}>
+                  <div className="security-dependency">
+                    <span className={`severity-${finding.severity}`}>{finding.severity}</span>
+                    <span className="tree-label">
+                      {finding.name}: {finding.title}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </>
   )
 }
 
