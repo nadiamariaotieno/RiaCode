@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ConnectionGraph from './ConnectionGraph.jsx'
 import { sampleChanges, sampleProject } from '../mockWorkspace.js'
 
 export default function Sidebar({
@@ -27,6 +28,12 @@ export default function Sidebar({
   securityScanning,
   onScanSecurity,
   onOpenSecurityFinding,
+  connectionFileName,
+  connections,
+  connectionsError,
+  connectionsLoading,
+  onShowConnections,
+  onOpenConnection,
 }) {
   const [expanded, setExpanded] = useState({ src: true })
   const rootEntries = workspaceEntries?.['']
@@ -43,7 +50,9 @@ export default function Sidebar({
           ? 'Explorer'
           : view === 'security'
             ? 'Security'
-            : 'Source Control'
+            : view === 'xray'
+              ? 'X-Ray'
+              : 'Source Control'
       }
     >
       <h2>
@@ -51,7 +60,9 @@ export default function Sidebar({
           ? (workspaceName ?? sampleProject.name)
           : view === 'security'
             ? 'Security'
-            : 'Source Control'}
+            : view === 'xray'
+              ? 'X-Ray'
+              : 'Source Control'}
       </h2>
       {view === 'explorer' && (
         <>
@@ -106,6 +117,16 @@ export default function Sidebar({
             scanning={securityScanning}
             onScan={onScanSecurity}
             onOpenFinding={onOpenSecurityFinding}
+          />
+        ) : view === 'xray' ? (
+          <ConnectionGraph
+            workspaceName={workspaceName}
+            fileName={connectionFileName}
+            connections={connections}
+            error={connectionsError}
+            loading={connectionsLoading}
+            onShowConnections={onShowConnections}
+            onOpenFile={onOpenConnection}
           />
         ) : !workspaceName ? (
           <ul className="change-list">
