@@ -48,4 +48,7 @@ contextBridge.exposeInMainWorld('riacode', {
   gitCommit(message) {
     return ipcRenderer.invoke('git:commit', message)
   },
+  scanSecurity() {
+    return ipcRenderer.invoke('security:scan')
+  },
 })
