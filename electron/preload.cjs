@@ -36,4 +36,16 @@ contextBridge.exposeInMainWorld('riacode', {
   runCommand(command) {
     return ipcRenderer.invoke('terminal:run', command)
   },
+  gitStatus() {
+    return ipcRenderer.invoke('git:status')
+  },
+  gitDiff(relativePath) {
+    return ipcRenderer.invoke('git:diff', relativePath)
+  },
+  gitStage(relativePath, stage) {
+    return ipcRenderer.invoke('git:stage', { relativePath, stage })
+  },
+  gitCommit(message) {
+    return ipcRenderer.invoke('git:commit', message)
+  },
 })
