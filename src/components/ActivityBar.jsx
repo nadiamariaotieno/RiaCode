@@ -1,6 +1,7 @@
 const views = [
   { id: 'explorer', label: 'Explorer' },
   { id: 'source-control', label: 'Source Control' },
+  { id: 'security', label: 'Security' },
 ]
 
 export default function ActivityBar({ activeView, onSelectView, onNewWindow }) {
@@ -18,7 +19,13 @@ export default function ActivityBar({ activeView, onSelectView, onNewWindow }) {
           title={view.label}
           onClick={() => onSelectView(view.id)}
         >
-          {view.id === 'explorer' ? <FolderIcon /> : <BranchIcon />}
+          {view.id === 'explorer' ? (
+            <FolderIcon />
+          ) : view.id === 'source-control' ? (
+            <BranchIcon />
+          ) : (
+            <ShieldIcon />
+          )}
         </button>
       ))}
       <button
@@ -62,6 +69,19 @@ function FolderIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  )
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3.5 19 6.2v5.4c0 4.2-2.8 7.2-7 8.9-4.2-1.7-7-4.7-7-8.9V6.2L12 3.5Z"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
