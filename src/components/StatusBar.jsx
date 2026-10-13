@@ -5,6 +5,9 @@ export default function StatusBar({
   runtimeLabel,
   panelOpen,
   canSave,
+  securityLabel,
+  securityAlert,
+  onOpenSecurity,
   onSave,
   onToggleTheme,
   onTogglePanel,
@@ -16,6 +19,13 @@ export default function StatusBar({
         {statusMessage ? ` — ${statusMessage}` : ''}
       </span>
       <span className="status-actions">
+        <button
+          type="button"
+          className={securityAlert ? 'status-alert' : undefined}
+          onClick={onOpenSecurity}
+        >
+          {securityLabel}
+        </button>
         <button type="button" onClick={onSave} disabled={!canSave}>
           Save
         </button>
