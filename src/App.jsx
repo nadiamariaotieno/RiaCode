@@ -44,6 +44,10 @@ export default function App() {
   const [securityReport, setSecurityReport] = useState(null)
   const [securityError, setSecurityError] = useState('')
   const [securityScanning, setSecurityScanning] = useState(false)
+  const [connections, setConnections] = useState(null)
+  const [connectionsError, setConnectionsError] = useState('')
+  const [connectionsLoading, setConnectionsLoading] = useState(false)
+  const [graphRequest, setGraphRequest] = useState(0)
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -86,6 +90,53 @@ export default function App() {
 
   const tabs = openFileIds.map((id) => findDocument(id)).filter(Boolean)
   const activeFile = findDocument(activeFileId)
+
+  useEffect(() => {
+    if (activity !== 'xray') {
+      return undefined
+    }
+    const relativePath = activeFile?.relativePath
+    if (!workspaceName) {
+      return undefined
+    }
+    if (!desktop?.fileConnections) {
+      setConnections(null)
+      setConnectionsError('Show connections from the RiaCode desktop window.')
+      setConnectionsLoading(false)
+      return undefined
+    }
+    if (!relativePath) {
+      setConnections(null)
+      setConnectionsError('')
+      setConnectionsLoading(false)
+      return undefined
+    }
+
+    const generation = workspaceGeneration.current
+    let cancelled = false
+    setConnectionsLoading(true)
+    setConnectionsError('')
+    desktop.fileConnections(relativePath).then(
+      (result) => {
+        if (cancelled || generation !== workspaceGeneration.current) {
+          return
+        }
+        setConnections(result)
+        setConnectionsLoading(false)
+      },
+      (error) => {
+        if (cancelled || generation !== workspaceGeneration.current) {
+          return
+        }
+        setConnections(null)
+        setConnectionsError(error.message ?? 'Connections could not be read.')
+        setConnectionsLoading(false)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [activity, desktop, workspaceName, activeFile?.relativePath, graphRequest])
 
   function rememberDiskFile(opened) {
     setDiskFiles((current) => {
@@ -187,6 +238,9 @@ export default function App() {
       setSecurityReport(null)
       setSecurityError('')
       setSecurityScanning(false)
+      setConnections(null)
+      setConnectionsError('')
+      setConnectionsLoading(false)
       setActivity('explorer')
       setStatusMessage('')
 
@@ -665,6 +719,24 @@ export default function App() {
     }
   }
 
+  function showConnections() {
+    setActivity('xray')
+    if (activeFile?.relativePath) {
+      setGraphRequest((current) => current + 1)
+      return
+    }
+    if (selectedRelativePath) {
+      openWorkspaceFile(selectedRelativePath)
+      return
+    }
+    setConnections(null)
+    setConnectionsError('Open a file from this folder to see its connections.')
+  }
+
+  function openConnection(relativePath) {
+    openWorkspaceFile(relativePath)
+  }
+
   async function scanSecurity() {
     if (!desktop?.scanSecurity) {
       setStatusMessage('Scan from the RiaCode desktop window.')
@@ -805,6 +877,12 @@ export default function App() {
         securityScanning={securityScanning}
         onScanSecurity={scanSecurity}
         onOpenSecurityFinding={openSecurityFinding}
+        connectionFileName={activeFile?.relativePath ? activeFile.name : null}
+        connections={connections}
+        connectionsError={connectionsError}
+        connectionsLoading={connectionsLoading}
+        onShowConnections={showConnections}
+        onOpenConnection={openConnection}
       />
       <div className="workbench">
         <EditorArea
