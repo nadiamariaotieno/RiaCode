@@ -38,6 +38,9 @@ export default function App() {
   const [selectedRelativePath, setSelectedRelativePath] = useState(null)
   const [terminalOutput, setTerminalOutput] = useState('')
   const [commandRunning, setCommandRunning] = useState(false)
+  const [gitChanges, setGitChanges] = useState(null)
+  const [gitError, setGitError] = useState('')
+  const [gitDiffs, setGitDiffs] = useState([])
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -52,10 +55,31 @@ export default function App() {
 
   function findDocument(id) {
     return (
+      gitDiffs.find((file) => file.id === id) ??
       diskFiles.find((file) => file.id === id) ??
       findFile(sampleProject.files, id)
     )
   }
+
+  const refreshGit = useCallback(async () => {
+    if (!desktop?.gitStatus || !workspaceName) {
+      return
+    }
+    try {
+      const changes = await desktop.gitStatus()
+      setGitChanges(changes)
+      setGitError('')
+    } catch (error) {
+      setGitChanges([])
+      setGitError(error.message ?? 'Git status could not be read.')
+    }
+  }, [desktop, workspaceName])
+
+  useEffect(() => {
+    if (activity === 'source-control') {
+      refreshGit()
+    }
+  }, [activity, refreshGit])
 
   const tabs = openFileIds.map((id) => findDocument(id)).filter(Boolean)
   const activeFile = findDocument(activeFileId)
@@ -154,6 +178,9 @@ export default function App() {
       setExpandedFolders({})
       setSelectedRelativePath(null)
       setTerminalOutput('')
+      setGitChanges(null)
+      setGitError('')
+      setGitDiffs([])
       setActivity('explorer')
       setStatusMessage('')
 
@@ -573,9 +600,61 @@ export default function App() {
     const index = openFileIds.indexOf(id)
     const nextIds = openFileIds.filter((openId) => openId !== id)
     setOpenFileIds(nextIds)
+    setGitDiffs((current) => current.filter((file) => file.id !== id))
     if (activeFileId === id) {
       const neighbor = nextIds[index] ?? nextIds[index - 1] ?? null
       setActiveFileId(neighbor)
+    }
+  }
+
+  async function openGitDiff(relativePath) {
+    if (!desktop?.gitDiff) {
+      setStatusMessage('Open Git status from the RiaCode desktop window.')
+      return
+    }
+    try {
+      const text = await desktop.gitDiff(relativePath)
+      const id = `git-diff:${relativePath}`
+      const name = `${relativePath.split('/').pop()} (diff)`
+      editorRef.current?.replaceBuffer(id, text)
+      setGitDiffs((current) => [
+        ...current.filter((file) => file.id !== id),
+        { id, name, content: text },
+      ])
+      openFile(id)
+      setStatusMessage('')
+    } catch (error) {
+      setStatusMessage(error.message ?? 'The diff could not be opened.')
+    }
+  }
+
+  async function toggleGitStage(change) {
+    if (!desktop?.gitStage) {
+      return
+    }
+    const stage = !(change.staged && !change.unstaged)
+    try {
+      await desktop.gitStage(change.path, stage)
+      await refreshGit()
+      setStatusMessage('')
+    } catch (error) {
+      setStatusMessage(error.message ?? 'That change could not be staged.')
+    }
+  }
+
+  async function commitGit(message) {
+    if (!desktop?.gitCommit) {
+      setStatusMessage('Commit from the RiaCode desktop window.')
+      return false
+    }
+    try {
+      const summary = await desktop.gitCommit(message)
+      setStatusMessage(summary)
+      await refreshGit()
+      return true
+    } catch (error) {
+      setStatusMessage(error.message ?? 'The commit could not be created.')
+      return false
     }
   }
 
@@ -640,6 +719,12 @@ export default function App() {
         selectedRelativePath={selectedRelativePath}
         onToggleWorkspaceFolder={toggleWorkspaceFolder}
         onOpenWorkspaceFile={openWorkspaceFile}
+        gitChanges={gitChanges}
+        gitError={gitError}
+        onRefreshGit={refreshGit}
+        onOpenGitDiff={openGitDiff}
+        onToggleGitStage={toggleGitStage}
+        onGitCommit={commitGit}
       />
       <div className="workbench">
         <EditorArea
