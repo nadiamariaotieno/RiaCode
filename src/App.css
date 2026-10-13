@@ -208,6 +208,34 @@
   color: var(--accent);
 }
 
+.xray-graph {
+  display: block;
+  margin: 4px 8px 8px;
+}
+
+.xray-graph line {
+  stroke: var(--border);
+}
+
+.xray-graph text {
+  fill: var(--text);
+  font-size: 11px;
+}
+
+.xray-node {
+  fill: var(--surface);
+  stroke: var(--border);
+}
+
+.xray-center {
+  fill: var(--active);
+  stroke: var(--accent);
+}
+
+.xray-graph g[role='button'] {
+  cursor: pointer;
+}
+
 .tree-item.active {
   background: var(--active);
 }
