@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runCommandInDirectory, stopProcess } from './workspaceCommand.js'
+import { gitCommit, gitDiff, gitStage, gitStatus } from './workspaceGit.js'
 import {
   createWorkspaceFile,
   deleteWorkspaceEntry,
@@ -258,6 +259,42 @@ ipcMain.handle('workspace:delete', async (event, relativePath) => {
   const removed = await deleteWorkspaceEntry(current.workspaceRoot, relativePath)
   dropApproved(current.approvedFiles, removed.realPath, removed.type === 'folder')
   return removed
+})
+
+ipcMain.handle('git:status', async (event) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  return gitStatus(current.workspaceRoot)
+})
+
+ipcMain.handle('git:diff', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  return gitDiff(current.workspaceRoot, relativePath)
+})
+
+ipcMain.handle('git:stage', async (event, payload) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (!payload || typeof payload.relativePath !== 'string' || typeof payload.stage !== 'boolean') {
+    throw new Error('A path inside the open folder is required.')
+  }
+  await gitStage(current.workspaceRoot, payload.relativePath, payload.stage)
+  return null
+})
+
+ipcMain.handle('git:commit', async (event, message) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  return gitCommit(current.workspaceRoot, message)
 })
 
 ipcMain.handle('terminal:run', async (event, command) => {
