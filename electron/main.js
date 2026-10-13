@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItem, session } from 'el
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { runCommandInDirectory, stopProcess } from './workspaceCommand.js'
 import {
   createWorkspaceFile,
   deleteWorkspaceEntry,
@@ -259,6 +260,31 @@ ipcMain.handle('workspace:delete', async (event, relativePath) => {
   return removed
 })
 
+ipcMain.handle('terminal:run', async (event, command) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (current.command) {
+    throw new Error('A command is already running.')
+  }
+
+  current.command = true
+  try {
+    return await runCommandInDirectory(current.workspaceRoot, command, {
+      onStart(child) {
+        if (current.command !== true) {
+          stopProcess(child)
+          return
+        }
+        current.command = child
+      },
+    })
+  } finally {
+    current.command = null
+  }
+})
+
 ipcMain.handle('window:new', () => {
   createWindow()
   return null
@@ -315,8 +341,16 @@ function createWindow() {
   windowSessions.set(sessionId, {
     workspaceRoot: null,
     approvedFiles: new Set(),
+    command: null,
   })
   win.on('closed', () => {
+    const current = windowSessions.get(sessionId)
+    if (current?.command && current.command !== true) {
+      stopProcess(current.command)
+    }
+    if (current) {
+      current.command = null
+    }
     windowSessions.delete(sessionId)
   })
 
