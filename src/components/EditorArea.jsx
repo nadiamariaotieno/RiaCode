@@ -61,8 +61,14 @@ const EditorArea = forwardRef(function EditorArea(
   const containerRef = useRef(null)
   const editorRef = useRef(null)
   const modelsRef = useRef(new Map())
+  const pendingLineRef = useRef(null)
   const dirtyChangeRef = useRef(onDirtyChange)
   const themeRef = useRef(theme)
+
+  function revealLine(editor, line) {
+    editor.setPosition({ lineNumber: line, column: 1 })
+    editor.revealLineInCenter(line)
+  }
 
   useEffect(() => {
     dirtyChangeRef.current = onDirtyChange
@@ -121,6 +127,23 @@ const EditorArea = forwardRef(function EditorArea(
       modelsRef.current.set(newId, { model, subscription, savedContent })
       if (wasCurrent && editor) {
         editor.setModel(model)
+      }
+    },
+    showLine(id, line) {
+      if (!id || !Number.isInteger(line) || line < 1) {
+        return
+      }
+      pendingLineRef.current = { id, line }
+      const editor = editorRef.current
+      const entry = modelsRef.current.get(id)
+      if (
+        editor &&
+        entry &&
+        !entry.model.isDisposed() &&
+        editor.getModel() === entry.model
+      ) {
+        revealLine(editor, line)
+        pendingLineRef.current = null
       }
     },
   }))
@@ -194,6 +217,11 @@ const EditorArea = forwardRef(function EditorArea(
 
     editor.setModel(entry.model)
     editor.layout()
+    const pending = pendingLineRef.current
+    if (pending && pending.id === fileId) {
+      revealLine(editor, pending.line)
+      pendingLineRef.current = null
+    }
   }, [activeFile])
 
   useEffect(() => {
