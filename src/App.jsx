@@ -36,6 +36,8 @@ export default function App() {
   const [workspaceEntries, setWorkspaceEntries] = useState({})
   const [expandedFolders, setExpandedFolders] = useState({})
   const [selectedRelativePath, setSelectedRelativePath] = useState(null)
+  const [terminalOutput, setTerminalOutput] = useState('')
+  const [commandRunning, setCommandRunning] = useState(false)
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -151,6 +153,7 @@ export default function App() {
       setWorkspaceEntries({})
       setExpandedFolders({})
       setSelectedRelativePath(null)
+      setTerminalOutput('')
       setActivity('explorer')
       setStatusMessage('')
 
@@ -576,6 +579,41 @@ export default function App() {
     }
   }
 
+  async function runCommand(command) {
+    if (!desktop?.runCommand) {
+      setStatusMessage('Run a command from the RiaCode desktop window.')
+      return
+    }
+    if (!workspaceName) {
+      setStatusMessage('Open a folder before running a command.')
+      return
+    }
+
+    setCommandRunning(true)
+    setTerminalOutput((current) => `${current}${current ? '\n' : ''}> ${command}\n`)
+    try {
+      const result = await desktop.runCommand(command)
+      let note = ''
+      if (result.timedOut) {
+        note = 'Stopped after 30 seconds.'
+      } else if (result.truncated) {
+        note = 'Output was cut off.'
+      } else if (result.exitCode) {
+        note = `Exit code ${result.exitCode}`
+      }
+      setTerminalOutput(
+        (current) => `${current}${result.output ?? ''}${note ? `\n${note}` : ''}\n`,
+      )
+    } catch (error) {
+      setTerminalOutput(
+        (current) =>
+          `${current}${error.message ?? 'The command could not be started.'}\n`,
+      )
+    } finally {
+      setCommandRunning(false)
+    }
+  }
+
   function toggleTheme() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
   }
@@ -614,7 +652,14 @@ export default function App() {
           onCloseTab={closeTab}
           onDirtyChange={handleDirtyChange}
         />
-        {panelOpen && <BottomPanel />}
+        {panelOpen && (
+          <BottomPanel
+            workspaceName={workspaceName}
+            running={commandRunning}
+            output={terminalOutput}
+            onRunCommand={runCommand}
+          />
+        )}
       </div>
       <StatusBar
         fileName={activeFile?.filePath ?? activeFile?.id}
