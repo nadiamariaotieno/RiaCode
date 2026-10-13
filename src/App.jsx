@@ -41,6 +41,9 @@ export default function App() {
   const [gitChanges, setGitChanges] = useState(null)
   const [gitError, setGitError] = useState('')
   const [gitDiffs, setGitDiffs] = useState([])
+  const [securityReport, setSecurityReport] = useState(null)
+  const [securityError, setSecurityError] = useState('')
+  const [securityScanning, setSecurityScanning] = useState(false)
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -181,6 +184,9 @@ export default function App() {
       setGitChanges(null)
       setGitError('')
       setGitDiffs([])
+      setSecurityReport(null)
+      setSecurityError('')
+      setSecurityScanning(false)
       setActivity('explorer')
       setStatusMessage('')
 
@@ -559,6 +565,7 @@ export default function App() {
       const opened = await desktop.readWorkspaceFile(relativePath)
       setSelectedRelativePath(opened.relativePath ?? relativePath)
       rememberDiskFile(opened)
+      return opened.filePath
     } catch (error) {
       setStatusMessage(error.message ?? 'The file could not be opened.')
     }
@@ -658,6 +665,53 @@ export default function App() {
     }
   }
 
+  async function scanSecurity() {
+    if (!desktop?.scanSecurity) {
+      setStatusMessage('Scan from the RiaCode desktop window.')
+      return
+    }
+    if (!workspaceName) {
+      setStatusMessage('Open a folder before scanning.')
+      return
+    }
+
+    const generation = workspaceGeneration.current
+    setSecurityScanning(true)
+    setSecurityError('')
+    try {
+      const report = await desktop.scanSecurity()
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setSecurityReport(report)
+      setStatusMessage('')
+    } catch (error) {
+      if (generation !== workspaceGeneration.current) {
+        return
+      }
+      setSecurityReport(null)
+      setSecurityError(error.message ?? 'The scan could not finish.')
+    } finally {
+      if (generation === workspaceGeneration.current) {
+        setSecurityScanning(false)
+      }
+    }
+  }
+
+  function openSecurity() {
+    setActivity('security')
+    if (!securityReport && !securityScanning) {
+      scanSecurity()
+    }
+  }
+
+  async function openSecurityFinding(finding) {
+    const filePath = await openWorkspaceFile(finding.path)
+    if (filePath) {
+      editorRef.current?.showLine(filePath, finding.line)
+    }
+  }
+
   async function runCommand(command) {
     if (!desktop?.runCommand) {
       setStatusMessage('Run a command from the RiaCode desktop window.')
@@ -697,6 +751,27 @@ export default function App() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
   }
 
+  const securityCount = securityReport
+    ? securityReport.secrets.length +
+      (securityReport.dependencySummary
+        ? securityReport.dependencySummary.critical +
+          securityReport.dependencySummary.high +
+          securityReport.dependencySummary.moderate +
+          securityReport.dependencySummary.low +
+          securityReport.dependencySummary.info
+        : securityReport.dependencies.length)
+    : 0
+  let securityLabel = 'Security'
+  if (securityScanning) {
+    securityLabel = 'Security: scanning'
+  } else if (securityReport && securityCount > 0) {
+    securityLabel = `Security: ${securityCount}`
+  } else if (securityReport && securityReport.notes.length > 0) {
+    securityLabel = 'Security: check'
+  } else if (securityReport) {
+    securityLabel = 'Security: clear'
+  }
+
   return (
     <div className="app-shell">
       <ActivityBar
@@ -725,6 +800,11 @@ export default function App() {
         onOpenGitDiff={openGitDiff}
         onToggleGitStage={toggleGitStage}
         onGitCommit={commitGit}
+        securityReport={securityReport}
+        securityError={securityError}
+        securityScanning={securityScanning}
+        onScanSecurity={scanSecurity}
+        onOpenSecurityFinding={openSecurityFinding}
       />
       <div className="workbench">
         <EditorArea
@@ -755,6 +835,9 @@ export default function App() {
         }
         panelOpen={panelOpen}
         canSave={Boolean(activeFile?.filePath) && dirtyIds.includes(activeFile?.id)}
+        securityLabel={securityLabel}
+        securityAlert={Boolean(securityReport) && securityCount > 0}
+        onOpenSecurity={openSecurity}
         onSave={saveActiveFile}
         onToggleTheme={toggleTheme}
         onTogglePanel={() => setPanelOpen((open) => !open)}
