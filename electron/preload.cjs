@@ -51,4 +51,7 @@ contextBridge.exposeInMainWorld('riacode', {
   scanSecurity() {
     return ipcRenderer.invoke('security:scan')
   },
+  fileConnections(relativePath) {
+    return ipcRenderer.invoke('graph:connections', relativePath)
+  },
 })
