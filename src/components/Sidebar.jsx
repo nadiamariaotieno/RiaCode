@@ -16,6 +16,12 @@ export default function Sidebar({
   selectedRelativePath,
   onToggleWorkspaceFolder,
   onOpenWorkspaceFile,
+  gitChanges,
+  gitError,
+  onRefreshGit,
+  onOpenGitDiff,
+  onToggleGitStage,
+  onGitCommit,
 }) {
   const [expanded, setExpanded] = useState({ src: true })
   const rootEntries = workspaceEntries?.['']
@@ -79,7 +85,7 @@ export default function Sidebar({
             onToggleFolder={toggleFolder}
             onOpenFile={onOpenFile}
           />
-        ) : (
+        ) : !workspaceName ? (
           <ul className="change-list">
             {sampleChanges.map((change) => (
               <li key={change.id}>
@@ -90,12 +96,91 @@ export default function Sidebar({
               </li>
             ))}
           </ul>
+        ) : (
+          <GitChanges
+            changes={gitChanges}
+            error={gitError}
+            onRefresh={onRefreshGit}
+            onOpenDiff={onOpenGitDiff}
+            onToggleStage={onToggleGitStage}
+            onCommit={onGitCommit}
+          />
         )}
       </div>
       {view === 'explorer' && !workspaceName && (
         <p className="sidebar-note">Sample data. These files are not on disk.</p>
       )}
+      {view !== 'explorer' && !workspaceName && (
+        <p className="sidebar-note">Sample data. These changes are not from Git.</p>
+      )}
     </aside>
+  )
+}
+
+function GitChanges({
+  changes,
+  error,
+  onRefresh,
+  onOpenDiff,
+  onToggleStage,
+  onCommit,
+}) {
+  const [message, setMessage] = useState('')
+
+  async function submit(event) {
+    event.preventDefault()
+    const trimmed = message.trim()
+    if (!trimmed) {
+      return
+    }
+    const committed = await onCommit(trimmed)
+    if (committed) {
+      setMessage('')
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className="sidebar-action" onClick={onRefresh}>
+        Refresh
+      </button>
+      {error ? (
+        <p className="sidebar-note">{error}</p>
+      ) : changes === null ? (
+        <p className="tree-message">Loading…</p>
+      ) : (
+        <>
+          <form className="git-commit" onSubmit={submit}>
+            <textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Commit message"
+              aria-label="Commit message"
+            />
+            <button type="submit" disabled={!message.trim()}>
+              Commit
+            </button>
+          </form>
+          {changes.length === 0 ? (
+            <p className="tree-message">No changes.</p>
+          ) : (
+            <ul className="change-list">
+              {changes.map((change) => (
+                <li key={change.path} className="change-row">
+                  <button type="button" onClick={() => onOpenDiff(change.path)}>
+                    <span>{change.label}</span>
+                    <span className="tree-label">{change.path}</span>
+                  </button>
+                  <button type="button" onClick={() => onToggleStage(change)}>
+                    {change.staged && !change.unstaged ? 'Unstage' : 'Stage'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </>
   )
 }
 
