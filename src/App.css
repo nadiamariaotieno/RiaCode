@@ -222,13 +222,50 @@
 }
 
 .bottom-panel {
-  height: 160px;
+  display: flex;
+  flex-direction: column;
+  height: 180px;
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
 
-.bottom-panel p {
-  padding: 0 12px 12px;
+.terminal-output {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 12px 8px;
+  overflow: auto;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.terminal-form {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 8px;
+}
+
+.terminal-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg);
+  font: 12px var(--mono);
+}
+
+.terminal-form button {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+}
+
+.terminal-form button:disabled,
+.terminal-form input:disabled {
+  color: var(--text-muted);
+  cursor: default;
 }
 
 .status-bar {
