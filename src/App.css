@@ -65,6 +65,11 @@
   text-align: left;
 }
 
+.sidebar-action:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .sidebar h2,
 .bottom-panel h2 {
   margin: 0;
@@ -185,6 +190,22 @@
 .status-bar button:disabled {
   color: var(--text-muted);
   cursor: default;
+}
+
+.status-alert {
+  color: var(--accent);
+}
+
+.security-dependency {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px;
+}
+
+.severity-critical,
+.severity-high {
+  color: var(--accent);
 }
 
 .tree-item.active {
