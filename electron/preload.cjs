@@ -33,4 +33,7 @@ contextBridge.exposeInMainWorld('riacode', {
   openWindow() {
     return ipcRenderer.invoke('window:new')
   },
+  runCommand(command) {
+    return ipcRenderer.invoke('terminal:run', command)
+  },
 })
