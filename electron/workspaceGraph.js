@@ -140,31 +140,43 @@ function readNextSpecifier(source, index) {
     if (char === ';') {
       return null
     }
-    if (char === "'" || char === '"') {
-      return readQuoted(source, cursor)
-    }
     cursor += 1
   }
   return null
 }
 
-function readSpecifierAfterFrom(source, index) {
+function readModuleSpecifier(source, index, bareString) {
   let cursor = index
+  let depth = 0
   const end = Math.min(source.length, index + 800)
   while (cursor < end) {
     cursor = skipSpaceAndComments(source, cursor)
     if (cursor >= end) {
       return null
     }
-    if (matchKeyword(source, cursor, 'from')) {
-      return readNextSpecifier(source, cursor + 4)
-    }
-    if (source[cursor] === ';') {
-      return null
-    }
-    if (source[cursor] === "'" || source[cursor] === '"') {
+    const char = source[cursor]
+    if (char === "'" || char === '"') {
+      if (bareString && depth === 0) {
+        return readQuoted(source, cursor)
+      }
       cursor = skipString(source, cursor)
       continue
+    }
+    if (char === '{') {
+      depth += 1
+      cursor += 1
+      continue
+    }
+    if (char === '}') {
+      depth = Math.max(0, depth - 1)
+      cursor += 1
+      continue
+    }
+    if (char === ';') {
+      return null
+    }
+    if (depth === 0 && matchKeyword(source, cursor, 'from')) {
+      return readNextSpecifier(source, cursor + 4)
     }
     cursor += 1
   }
@@ -202,7 +214,7 @@ function extractScriptSpecifiers(source) {
       const quoted =
         source[after] === '('
           ? readNextSpecifier(source, after + 1)
-          : readSpecifierAfterFrom(source, after) ?? readNextSpecifier(source, after)
+          : readModuleSpecifier(source, after, true)
       if (quoted?.specifier) {
         specifiers.push(quoted.specifier)
         index = quoted.end
@@ -211,7 +223,7 @@ function extractScriptSpecifiers(source) {
     }
 
     if (matchKeyword(source, index, 'export')) {
-      const quoted = readSpecifierAfterFrom(source, index + 'export'.length)
+      const quoted = readModuleSpecifier(source, index + 'export'.length, false)
       if (quoted?.specifier) {
         specifiers.push(quoted.specifier)
         index = quoted.end
@@ -430,7 +442,7 @@ export async function buildImportGraph(root) {
         break
       }
       scannedFiles += 1
-      const relativePath = toPortableRelative(root, childPath)
+      const relativePath = toPortableRelative(root, realPath)
       try {
         const text = await readSource(realPath)
         if (text === null) {
@@ -462,7 +474,7 @@ function lookup(files, target) {
   return []
 }
 
-export async function fileConnections(root, relativePath) {
+export async function connectionsFromGraph(root, relativePath, graph) {
   const realPath = await resolveInsideRoot(root, relativePath)
   const info = await fs.stat(realPath)
   if (!info.isFile()) {
@@ -470,7 +482,6 @@ export async function fileConnections(root, relativePath) {
   }
 
   const target = toPortableRelative(root, realPath)
-  const graph = await buildImportGraph(root)
   const imports = lookup(graph.files, target)
   const importedBy = []
   for (const [file, edges] of graph.files) {
@@ -489,4 +500,9 @@ export async function fileConnections(root, relativePath) {
     scannedFiles: graph.scannedFiles,
     truncated: graph.truncated,
   }
+}
+
+export async function fileConnections(root, relativePath) {
+  const graph = await buildImportGraph(root)
+  return connectionsFromGraph(root, relativePath, graph)
 }
