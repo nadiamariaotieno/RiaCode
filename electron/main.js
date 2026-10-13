@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runCommandInDirectory, stopProcess } from './workspaceCommand.js'
 import { gitCommit, gitDiff, gitStage, gitStatus } from './workspaceGit.js'
+import { scanWorkspace } from './workspaceSecurity.js'
 import {
   createWorkspaceFile,
   deleteWorkspaceEntry,
@@ -297,6 +298,36 @@ ipcMain.handle('git:commit', async (event, message) => {
   return gitCommit(current.workspaceRoot, message)
 })
 
+ipcMain.handle('security:scan', async (event) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (current.audit) {
+    throw new Error('A security scan is already running.')
+  }
+
+  const root = current.workspaceRoot
+  current.audit = true
+  try {
+    const report = await scanWorkspace(root, {
+      onAuditStart(child) {
+        if (current.audit !== true) {
+          stopProcess(child)
+          return
+        }
+        current.audit = child
+      },
+    })
+    if (current.workspaceRoot !== root) {
+      throw new Error('The folder changed.')
+    }
+    return report
+  } finally {
+    current.audit = null
+  }
+})
+
 ipcMain.handle('terminal:run', async (event, command) => {
   const current = sessionFor(event)
   if (!current.workspaceRoot) {
@@ -379,14 +410,19 @@ function createWindow() {
     workspaceRoot: null,
     approvedFiles: new Set(),
     command: null,
+    audit: null,
   })
   win.on('closed', () => {
     const current = windowSessions.get(sessionId)
     if (current?.command && current.command !== true) {
       stopProcess(current.command)
     }
+    if (current?.audit && current.audit !== true) {
+      stopProcess(current.audit)
+    }
     if (current) {
       current.command = null
+      current.audit = null
     }
     windowSessions.delete(sessionId)
   })
