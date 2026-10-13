@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runCommandInDirectory, stopProcess } from './workspaceCommand.js'
 import { gitCommit, gitDiff, gitStage, gitStatus } from './workspaceGit.js'
 import { scanWorkspace } from './workspaceSecurity.js'
+import { buildImportGraph, connectionsFromGraph } from './workspaceGraph.js'
 import {
   createWorkspaceFile,
   deleteWorkspaceEntry,
@@ -145,6 +146,7 @@ ipcMain.handle('file:save', async (event, payload) => {
   }
 
   await fs.writeFile(realPath, buffer)
+  invalidateGraph(current)
   return { filePath: realPath }
 })
 
@@ -165,6 +167,7 @@ ipcMain.handle('workspace:open', async (event) => {
   }
 
   current.workspaceRoot = realPath
+  invalidateGraph(current)
   return { name: path.basename(realPath) }
 })
 
@@ -197,6 +200,7 @@ ipcMain.handle('workspace:createFile', async (event, relativePath) => {
   }
 
   const realPath = await createWorkspaceFile(current.workspaceRoot, relativePath)
+  invalidateGraph(current)
   const opened = await readApprovedTextFile(current.approvedFiles, realPath)
   return {
     ...opened,
@@ -216,6 +220,29 @@ function retargetApproved(approvedFiles, fromReal, toReal, isFolder) {
     const relative = path.relative(fromReal, approved)
     approvedFiles.add(relative === '' ? toReal : path.join(toReal, relative))
   }
+}
+
+function invalidateGraph(current) {
+  current.graphGeneration = (current.graphGeneration ?? 0) + 1
+  current.importGraph = null
+}
+
+async function graphFor(current) {
+  const root = current.workspaceRoot
+  const generation = current.graphGeneration ?? 0
+  if (
+    current.importGraph?.root === root &&
+    current.importGraph.generation === generation
+  ) {
+    return current.importGraph.built
+  }
+
+  const built = await buildImportGraph(root)
+  if (current.workspaceRoot !== root || (current.graphGeneration ?? 0) !== generation) {
+    throw new Error('The folder changed.')
+  }
+  current.importGraph = { root, generation, built }
+  return built
 }
 
 function dropApproved(approvedFiles, realPath, isFolder) {
@@ -248,6 +275,7 @@ ipcMain.handle('workspace:rename', async (event, payload) => {
       renamed.type === 'folder',
     )
   }
+  invalidateGraph(current)
   return renamed
 })
 
@@ -259,6 +287,7 @@ ipcMain.handle('workspace:delete', async (event, relativePath) => {
 
   const removed = await deleteWorkspaceEntry(current.workspaceRoot, relativePath)
   dropApproved(current.approvedFiles, removed.realPath, removed.type === 'folder')
+  invalidateGraph(current)
   return removed
 })
 
@@ -296,6 +325,21 @@ ipcMain.handle('git:commit', async (event, message) => {
     throw new Error('Open a folder first.')
   }
   return gitCommit(current.workspaceRoot, message)
+})
+
+ipcMain.handle('graph:connections', async (event, relativePath) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (typeof relativePath !== 'string') {
+    throw new Error('A path inside the open folder is required.')
+  }
+  const graph = await graphFor(current)
+  if (current.workspaceRoot === null) {
+    throw new Error('Open a folder first.')
+  }
+  return connectionsFromGraph(current.workspaceRoot, relativePath, graph)
 })
 
 ipcMain.handle('security:scan', async (event) => {
@@ -411,6 +455,8 @@ function createWindow() {
     approvedFiles: new Set(),
     command: null,
     audit: null,
+    graphGeneration: 0,
+    importGraph: null,
   })
   win.on('closed', () => {
     const current = windowSessions.get(sessionId)
