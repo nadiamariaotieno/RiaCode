@@ -110,6 +110,50 @@
   padding: 4px 12px;
 }
 
+.change-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.change-row > button:first-child {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.change-row > button:last-child {
+  flex: none;
+  width: auto;
+}
+
+.git-commit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.git-commit textarea {
+  min-height: 56px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg);
+  font: inherit;
+  resize: vertical;
+}
+
+.git-commit button {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.git-commit button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .tree-twist {
   flex: none;
   width: 1em;
