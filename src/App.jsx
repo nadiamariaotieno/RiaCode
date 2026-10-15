@@ -5,6 +5,7 @@ import EditorArea from './components/EditorArea.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import StatusBar from './components/StatusBar.jsx'
 import { findFile, sampleProject } from './mockWorkspace.js'
+import { collectSymbols } from './languageSymbols.js'
 import './App.css'
 
 function readInitialTheme() {
@@ -48,6 +49,7 @@ export default function App() {
   const [connectionsError, setConnectionsError] = useState('')
   const [connectionsLoading, setConnectionsLoading] = useState(false)
   const [graphRequest, setGraphRequest] = useState(0)
+  const [outlineByFile, setOutlineByFile] = useState({})
   const editorRef = useRef(null)
   const workspaceGeneration = useRef(0)
 
@@ -67,6 +69,10 @@ export default function App() {
       findFile(sampleProject.files, id)
     )
   }
+
+  const rememberSymbols = useCallback((fileId, symbols) => {
+    setOutlineByFile((current) => ({ ...current, [fileId]: symbols }))
+  }, [])
 
   const refreshGit = useCallback(async () => {
     if (!desktop?.gitStatus || !workspaceName) {
@@ -719,6 +725,64 @@ export default function App() {
     }
   }
 
+  function revealSymbol(line) {
+    if (!activeFile) {
+      return
+    }
+    editorRef.current?.showLine(activeFile.id, line)
+  }
+
+  async function goToDefinition() {
+    const cursor = editorRef.current?.cursorWord()
+    if (!cursor || !activeFile) {
+      setStatusMessage('Place the cursor on a name.')
+      return
+    }
+    const text = editorRef.current?.getValue(activeFile.id) ?? activeFile.content ?? ''
+    const local = collectSymbols(text).find(
+      (symbol) => symbol.name === cursor.word && symbol.line !== cursor.line,
+    )
+    if (local) {
+      editorRef.current?.showLine(activeFile.id, local.line)
+      setStatusMessage('')
+      return
+    }
+    if (!activeFile.relativePath || !desktop?.findDefinition) {
+      setStatusMessage('No definition was found for that name in this file.')
+      return
+    }
+    try {
+      const result = await desktop.findDefinition(
+        activeFile.relativePath,
+        text,
+        cursor.word,
+      )
+      if (result.kind === 'file') {
+        const filePath = await openWorkspaceFile(result.path)
+        if (filePath) {
+          editorRef.current?.showLine(filePath, result.line)
+        }
+        setStatusMessage('')
+        return
+      }
+      if (result.kind === 'package') {
+        setStatusMessage(`That name comes from the package ${result.specifier}.`)
+        return
+      }
+      if (result.kind === 'outside') {
+        setStatusMessage('That import points outside the open folder.')
+        return
+      }
+      if (result.kind === 'missing') {
+        setStatusMessage('That import does not match a file in this folder.')
+        return
+      }
+      setStatusMessage('No definition was found for that name.')
+    } catch (error) {
+      setStatusMessage(error.message ?? 'The definition could not be opened.')
+    }
+  }
+
   function showConnections() {
     setActivity('xray')
     if (activeFile?.relativePath) {
@@ -883,6 +947,10 @@ export default function App() {
         connectionsLoading={connectionsLoading}
         onShowConnections={showConnections}
         onOpenConnection={openConnection}
+        outlineSymbols={activeFile ? (outlineByFile[activeFile.id] ?? []) : []}
+        outlineFileName={activeFile?.name ?? null}
+        onRevealSymbol={revealSymbol}
+        onGoToDefinition={goToDefinition}
       />
       <div className="workbench">
         <EditorArea
@@ -894,6 +962,8 @@ export default function App() {
           onSelectTab={setActiveFileId}
           onCloseTab={closeTab}
           onDirtyChange={handleDirtyChange}
+          onSymbolsChange={rememberSymbols}
+          onGoToDefinition={goToDefinition}
         />
         {panelOpen && (
           <BottomPanel
