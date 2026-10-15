@@ -297,7 +297,7 @@ function rememberPath(seen, realPath) {
   return true
 }
 
-async function resolveEdge(root, fromRelative, specifier) {
+export async function resolveEdge(root, fromRelative, specifier) {
   const cleaned = cleanSpecifier(specifier)
   if (!cleaned || cleaned.includes('\0')) {
     return null
