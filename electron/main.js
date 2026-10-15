@@ -6,6 +6,7 @@ import { runCommandInDirectory, stopProcess } from './workspaceCommand.js'
 import { gitCommit, gitDiff, gitStage, gitStatus } from './workspaceGit.js'
 import { scanWorkspace } from './workspaceSecurity.js'
 import { buildImportGraph, connectionsFromGraph } from './workspaceGraph.js'
+import { findDefinition } from './workspaceSymbols.js'
 import {
   createWorkspaceFile,
   deleteWorkspaceEntry,
@@ -56,7 +57,7 @@ function applyContentSecurityPolicy() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [contentSecurityPolicy()],
-      },
+      }, 
     })
   })
 }
@@ -325,6 +326,22 @@ ipcMain.handle('git:commit', async (event, message) => {
     throw new Error('Open a folder first.')
   }
   return gitCommit(current.workspaceRoot, message)
+})
+
+ipcMain.handle('language:definition', async (event, payload) => {
+  const current = sessionFor(event)
+  if (!current.workspaceRoot) {
+    throw new Error('Open a folder first.')
+  }
+  if (!payload || typeof payload.relativePath !== 'string' || typeof payload.name !== 'string') {
+    throw new Error('A name in the open file is required.')
+  }
+  return findDefinition(
+    current.workspaceRoot,
+    payload.relativePath,
+    payload.content,
+    payload.name,
+  )
 })
 
 ipcMain.handle('graph:connections', async (event, relativePath) => {
