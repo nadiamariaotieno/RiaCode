@@ -34,6 +34,10 @@ export default function Sidebar({
   connectionsLoading,
   onShowConnections,
   onOpenConnection,
+  outlineSymbols,
+  outlineFileName,
+  onRevealSymbol,
+  onGoToDefinition,
 }) {
   const [expanded, setExpanded] = useState({ src: true })
   const rootEntries = workspaceEntries?.['']
@@ -52,7 +56,9 @@ export default function Sidebar({
             ? 'Security'
             : view === 'xray'
               ? 'X-Ray'
-              : 'Source Control'
+              : view === 'outline'
+                ? 'Outline'
+                : 'Source Control'
       }
     >
       <h2>
@@ -62,7 +68,9 @@ export default function Sidebar({
             ? 'Security'
             : view === 'xray'
               ? 'X-Ray'
-              : 'Source Control'}
+              : view === 'outline'
+                ? 'Outline'
+                : 'Source Control'}
       </h2>
       {view === 'explorer' && (
         <>
@@ -128,6 +136,13 @@ export default function Sidebar({
             onShowConnections={onShowConnections}
             onOpenFile={onOpenConnection}
           />
+        ) : view === 'outline' ? (
+          <OutlineList
+            fileName={outlineFileName}
+            symbols={outlineSymbols}
+            onReveal={onRevealSymbol}
+            onGoToDefinition={onGoToDefinition}
+          />
         ) : !workspaceName ? (
           <ul className="change-list">
             {sampleChanges.map((change) => (
@@ -157,6 +172,47 @@ export default function Sidebar({
         <p className="sidebar-note">Sample data. These changes are not from Git.</p>
       )}
     </aside>
+  )
+}
+
+function OutlineList({ fileName, symbols, onReveal, onGoToDefinition }) {
+  const isJavaScript = fileName?.endsWith('.js') || fileName?.endsWith('.jsx')
+
+  return (
+    <>
+      <button
+        type="button"
+        className="sidebar-action"
+        onClick={onGoToDefinition}
+        disabled={!fileName}
+      >
+        Go to definition
+      </button>
+      {!fileName ? (
+        <p className="tree-message">Open a file, then place the cursor on a name.</p>
+      ) : !isJavaScript ? (
+        <p className="tree-message">Symbols are listed for JavaScript files.</p>
+      ) : symbols.length === 0 ? (
+        <p className="tree-message">No symbols in this file.</p>
+      ) : (
+        <ul className="change-list">
+          {symbols.map((symbol) => (
+            <li key={`${symbol.kind}:${symbol.name}:${symbol.line}`}>
+              <button
+                type="button"
+                onClick={() => onReveal(symbol.line)}
+                style={{ paddingLeft: 12 + Math.min(symbol.depth, 6) * 12 }}
+              >
+                <span>{symbol.kind}</span>
+                <span className="tree-label">
+                  {symbol.name}:{symbol.line}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   )
 }
 
