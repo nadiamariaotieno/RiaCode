@@ -3,6 +3,7 @@ const views = [
   { id: 'source-control', label: 'Source Control' },
   { id: 'security', label: 'Security' },
   { id: 'xray', label: 'X-Ray' },
+  { id: 'outline', label: 'Outline' },
 ]
 
 const viewIcons = {
@@ -10,6 +11,7 @@ const viewIcons = {
   'source-control': <BranchIcon />,
   security: <ShieldIcon />,
   xray: <GraphIcon />,
+  outline: <OutlineIcon />,
 }
 
 export default function ActivityBar({ activeView, onSelectView, onNewWindow }) {
@@ -71,6 +73,19 @@ function FolderIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-11Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  )
+}
+
+function OutlineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M5 7h14M5 12h10M5 17h12"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
