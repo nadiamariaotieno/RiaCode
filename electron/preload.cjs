@@ -54,4 +54,7 @@ contextBridge.exposeInMainWorld('riacode', {
   fileConnections(relativePath) {
     return ipcRenderer.invoke('graph:connections', relativePath)
   },
+  findDefinition(relativePath, content, name) {
+    return ipcRenderer.invoke('language:definition', { relativePath, content, name })
+  },
 })
