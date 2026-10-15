@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import * as monaco from 'monaco-editor'
+import { collectSymbols } from '../languageSymbols.js'
 
 monaco.editor.defineTheme('riacode-light', {
   base: 'vs',
@@ -55,6 +56,8 @@ const EditorArea = forwardRef(function EditorArea(
     onSelectTab,
     onCloseTab,
     onDirtyChange,
+    onSymbolsChange,
+    onGoToDefinition,
   },
   ref,
 ) {
@@ -63,6 +66,9 @@ const EditorArea = forwardRef(function EditorArea(
   const modelsRef = useRef(new Map())
   const pendingLineRef = useRef(null)
   const dirtyChangeRef = useRef(onDirtyChange)
+  const onSymbolsRef = useRef(onSymbolsChange)
+  const onDefineRef = useRef(onGoToDefinition)
+  const symbolTimerRef = useRef(null)
   const themeRef = useRef(theme)
 
   function revealLine(editor, line) {
@@ -70,9 +76,23 @@ const EditorArea = forwardRef(function EditorArea(
     editor.revealLineInCenter(line)
   }
 
+  function publishSymbols(fileId, model) {
+    const symbols =
+      model.getLanguageId() === 'javascript' ? collectSymbols(model.getValue()) : []
+    onSymbolsRef.current?.(fileId, symbols)
+  }
+
   useEffect(() => {
     dirtyChangeRef.current = onDirtyChange
   }, [onDirtyChange])
+
+  useEffect(() => {
+    onSymbolsRef.current = onSymbolsChange
+  }, [onSymbolsChange])
+
+  useEffect(() => {
+    onDefineRef.current = onGoToDefinition
+  }, [onGoToDefinition])
 
   useImperativeHandle(ref, () => ({
     getValue(id) {
@@ -146,6 +166,19 @@ const EditorArea = forwardRef(function EditorArea(
         pendingLineRef.current = null
       }
     },
+    cursorWord() {
+      const editor = editorRef.current
+      const model = editor?.getModel()
+      const position = editor?.getPosition()
+      if (!editor || !model || !position) {
+        return null
+      }
+      const word = model.getWordAtPosition(position)
+      if (!word) {
+        return null
+      }
+      return { word: word.word, line: position.lineNumber }
+    },
   }))
 
   useEffect(() => {
@@ -157,9 +190,13 @@ const EditorArea = forwardRef(function EditorArea(
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
     })
+    editor.addCommand(monaco.KeyCode.F12, () => {
+      onDefineRef.current?.()
+    })
     editorRef.current = editor
 
     return () => {
+      clearTimeout(symbolTimerRef.current)
       editor.dispose()
       editorRef.current = null
     }
@@ -200,6 +237,10 @@ const EditorArea = forwardRef(function EditorArea(
           fileId,
           model.getValue() !== current?.savedContent,
         )
+        clearTimeout(symbolTimerRef.current)
+        symbolTimerRef.current = setTimeout(() => {
+          publishSymbols(fileId, model)
+        }, 200)
       })
       entry = {
         model,
@@ -222,6 +263,7 @@ const EditorArea = forwardRef(function EditorArea(
       revealLine(editor, pending.line)
       pendingLineRef.current = null
     }
+    publishSymbols(fileId, entry.model)
   }, [activeFile])
 
   useEffect(() => {
